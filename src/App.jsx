@@ -18,6 +18,8 @@ import Icon from './components/Icon.jsx';
 
 // Only restaurant teams need the dashboard, so customers never download it.
 const DashboardApp = lazy(() => import('./dashboard/DashboardApp.jsx'));
+// Same for the Forkfly admin dashboard.
+const AdminApp = lazy(() => import('./admin/AdminApp.jsx'));
 import { Link } from './router.jsx';
 import Footer from './components/Footer.jsx';
 
@@ -63,6 +65,13 @@ export default function App() {
     return (
       <Suspense fallback={<div className="dash-loading" aria-label="Loading" />}>
         <DashboardApp me={me} path={path} />
+      </Suspense>
+    );
+
+  if (path === '/admin' || path.startsWith('/admin/'))
+    return (
+      <Suspense fallback={<div className="dash-loading" aria-label="Loading" />}>
+        <AdminApp me={me} path={path} />
       </Suspense>
     );
 

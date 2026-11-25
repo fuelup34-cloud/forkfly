@@ -2314,3 +2314,6 @@ textarea {
     gap: 24px;
   }
 }
+.account-admin-link {
+  margin-left: 8px;
+}

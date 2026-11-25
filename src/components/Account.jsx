@@ -48,6 +48,11 @@ export default function Account({ me, onSignedOut }) {
           <Link to="/orders" className="btn btn--outline btn--sm">
             Your orders
           </Link>
+          {user.role === 'admin' && (
+            <Link to="/admin" className="btn btn--sm account-admin-link">
+              Admin dashboard
+            </Link>
+          )}
         </div>
       </section>
 

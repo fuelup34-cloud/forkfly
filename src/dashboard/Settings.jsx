@@ -3,13 +3,14 @@ import { dash, forgetRestaurantCache } from '../api.js';
 import { Link } from '../router.jsx';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
 import PhotoField from './PhotoField.jsx';
+import { Avatar, SaveBar } from '../ui/kit.jsx';
 
 const PREP = [5, 10, 15, 20, 25, 30, 40, 45, 60];
 
 export default function Settings({ restaurant, onChange }) {
   const owner = restaurant.role === 'owner';
   return (
-    <div className="settings">
+    <div className="settings dash-settings">
       <Profile restaurant={restaurant} owner={owner} onChange={onChange} />
       <Team restaurant={restaurant} owner={owner} />
       <section className="dash-card">
@@ -112,14 +113,7 @@ function Profile({ restaurant, owner, onChange }) {
           {status.error}
         </p>
       )}
-      {owner && (
-        <div className="form-actions">
-          {status.saved && !dirty && <span className="saved-note">Saved</span>}
-          <button type="submit" className="btn" disabled={busy || !dirty}>
-            {busy ? 'Saving…' : 'Save changes'}
-          </button>
-        </div>
-      )}
+      {owner && <SaveBar dirty={dirty} busy={busy} note={status.saved ? 'Profile saved.' : ''} onDiscard={() => setForm(pick(restaurant))} />}
     </form>
   );
 }
@@ -175,9 +169,7 @@ function Team({ restaurant, owner }) {
       <ul className="team">
         {(staff ?? []).map((p) => (
           <li key={p.id}>
-            <span className="team__avatar" aria-hidden="true">
-              {p.name.trim()[0]?.toUpperCase()}
-            </span>
+            <Avatar name={p.name} />
             <span className="team__text">
               <strong>
                 {p.name}
@@ -185,9 +177,9 @@ function Team({ restaurant, owner }) {
               </strong>
               <span className="muted small">{p.email}</span>
             </span>
-            <span className="pill">{p.role === 'owner' ? 'Owner' : 'Staff'}</span>
+            <span className={`badge ${p.role === 'owner' ? 'badge--good' : ''}`}>{p.role === 'owner' ? 'Owner' : 'Staff'}</span>
             {owner && !p.you && (
-              <button type="button" className="text-btn" onClick={() => remove(p)}>
+              <button type="button" className="text-btn small text-btn--danger" onClick={() => remove(p)}>
                 Remove
               </button>
             )}

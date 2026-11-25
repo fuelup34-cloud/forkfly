@@ -5,6 +5,7 @@ import { imageUrl } from '../images.js';
 import Icon from '../components/Icon.jsx';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
 import PhotoField from './PhotoField.jsx';
+import { SearchBox, StatTile, Tabs, count } from '../ui/kit.jsx';
 
 const EMPTY = { name: '', description: '', category: '', price: '', image: null, popular: false, veg: false, spicy: false };
 
@@ -20,6 +21,7 @@ export default function MenuEditor({ restaurant }) {
   const [items, setItems] = useState(null);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
+  const [show, setShow] = useState('all');
   const [editing, setEditing] = useState(null); // an item, or EMPTY for a new one
 
   useEffect(() => {
@@ -35,11 +37,12 @@ export default function MenuEditor({ restaurant }) {
     const map = new Map();
     for (const i of items ?? []) {
       if (q && !`${i.name} ${i.description} ${i.category}`.toLowerCase().includes(q)) continue;
+      if ((show === 'available' && !i.available) || (show === 'sold-out' && i.available)) continue;
       if (!map.has(i.category)) map.set(i.category, []);
       map.get(i.category).push(i);
     }
     return [...map];
-  }, [items, query]);
+  }, [items, query, show]);
 
   const replace = (item) => {
     forgetRestaurantCache();
@@ -64,14 +67,25 @@ export default function MenuEditor({ restaurant }) {
 
   return (
     <div className="menu-editor">
-      <div className="toolbar-row">
-        <label className="search search--compact">
-          <Icon name="search" size={16} />
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your menu" aria-label="Search your menu" />
-        </label>
-        <p className="muted small toolbar-row__info">
-          {items ? `${items.length} item${items.length === 1 ? '' : 's'}${soldOut ? ` · ${soldOut} sold out` : ''}` : ''}
-        </p>
+      {items && items.length > 0 && (
+        <dl className="stat-row dash-stats">
+          <StatTile label="Dishes" value={count(items.length)} hint={`in ${categories.length} ${categories.length === 1 ? 'category' : 'categories'}`} />
+          <StatTile label="Available now" value={count(items.length - soldOut)} />
+          <StatTile label="Sold out" value={count(soldOut)} hint={soldOut ? 'switch back on when restocked' : 'everything’s on'} />
+          <StatTile label="With a photo" value={count(items.filter((i) => i.image).length)} hint="photos sell more" />
+        </dl>
+      )}
+      <div className="toolbar-row dash-toolbar">
+        <Tabs
+          value={show}
+          onChange={setShow}
+          tabs={[
+            ['all', 'All', items?.length ?? null],
+            ['available', 'Available', items ? items.length - soldOut : null],
+            ['sold-out', 'Sold out', items ? soldOut : null],
+          ]}
+        />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search your menu" />
         {owner && (
           <button type="button" className="btn" onClick={() => setEditing(EMPTY)}>
             Add item
@@ -110,7 +124,7 @@ export default function MenuEditor({ restaurant }) {
                 <div className="menu-row__text">
                   <strong>
                     {item.name}
-                    {!item.available && <span className="pill pill--cancelled">Sold out</span>}
+                    {!item.available && <span className="badge badge--bad">Sold out</span>}
                   </strong>
                   {item.description && <span className="muted small menu-row__desc">{item.description}</span>}
                 </div>
@@ -130,7 +144,12 @@ export default function MenuEditor({ restaurant }) {
           </ul>
         </section>
       ))}
-      {items && items.length > 0 && grouped.length === 0 && <p className="muted center">Nothing matches “{query}”.</p>}
+      {items && items.length > 0 && grouped.length === 0 && (
+        <div className="dash-empty">
+          <Icon name={show === 'sold-out' ? 'plate' : 'search'} size={32} className="muted" />
+          <strong>{show === 'sold-out' && !query ? 'Nothing is sold out' : 'No dishes match'}</strong>
+        </div>
+      )}
 
       {editing && (
         <ItemSheet

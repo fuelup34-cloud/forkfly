@@ -5,21 +5,32 @@ import Logo from '../components/Logo.jsx';
 import Icon from '../components/Icon.jsx';
 import Monogram from '../components/Monogram.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
+import { PageHead, RangePicker, StatusPill } from '../ui/kit.jsx';
 import OrdersBoard from './OrdersBoard.jsx';
+import OrderHistory from './OrderHistory.jsx';
+import Overview from './Overview.jsx';
 import MenuEditor from './MenuEditor.jsx';
 import Settings from './Settings.jsx';
-import { TodayHistory, TodayStats } from './Today.jsx';
+import { useKitchen } from './useKitchen.js';
 import './dashboard.css';
+import '../ui/console.css';
 
 const TABS = [
-  ['', 'Orders', 'receipt'],
+  ['', 'Overview', 'grid'],
+  ['/orders', 'Orders', 'receipt'],
   ['/menu', 'Menu', 'plate'],
   ['/settings', 'Settings', 'store'],
 ];
+const SUBTITLE = {
+  '': (r) => `How ${r.name} is doing today.`,
+  '/orders': () => 'Accept new orders, then mark them ready for the courier.',
+  '/menu': () => 'What customers can order. Switch an item off when it sells out.',
+  '/settings': () => 'Your restaurant’s profile, and who can manage it.',
+};
 const STATUS_LABEL = { active: 'Open', paused: 'Paused', pending: 'Waiting for approval', suspended: 'Suspended' };
 
 export default function DashboardApp({ me, path }) {
-  const m = path.match(/^\/dashboard(?:\/([\w-]+))?(\/menu|\/settings)?\/?$/);
+  const m = path.match(/^\/dashboard(?:\/([\w-]+))?(\/orders|\/menu|\/settings)?\/?$/);
   const rid = m?.[1];
   const tab = m?.[2] ?? '';
 
@@ -100,6 +111,7 @@ function Restaurant({ me, rid, tab }) {
   const [error, setError] = useState('');
   const [today, setToday] = useState(null);
   const [toggling, setToggling] = useState(false);
+  const kitchen = useKitchen(rid);
 
   useEffect(() => {
     dash
@@ -108,12 +120,18 @@ function Restaurant({ me, rid, tab }) {
       .catch((err) => setError(err.message));
   }, [rid]);
 
+  // Today's totals change whenever an order leaves the board (picked up, declined, cancelled).
   const refreshToday = useCallback(() => {
     dash
       .today(rid)
       .then(setToday)
       .catch(() => {});
   }, [rid]);
+  const onBoard = kitchen.orders?.length;
+  const boardKey = (kitchen.orders ?? []).map((o) => `${o.id}:${o.status}`).join();
+  useEffect(() => {
+    if (onBoard != null) refreshToday();
+  }, [boardKey, onBoard, refreshToday]);
 
   if (error)
     return (
@@ -127,7 +145,7 @@ function Restaurant({ me, rid, tab }) {
   if (!restaurant) return <div className="dash-loading" aria-label="Loading" />;
 
   const base = `/dashboard/${rid}`;
-  const title = TABS.find(([t]) => t === tab)?.[1] ?? 'Orders';
+  const title = TABS.find(([t]) => t === tab)?.[1] ?? 'Overview';
   const canToggle = restaurant.status === 'active' || restaurant.status === 'paused';
 
   async function toggleOpen() {
@@ -165,7 +183,12 @@ function Restaurant({ me, rid, tab }) {
           {TABS.map(([t, label, icon]) => (
             <Link key={label} to={`${base}${t}`} className={`dash-nav__item ${t === tab ? 'is-active' : ''}`} aria-current={t === tab ? 'page' : undefined}>
               <Icon name={icon} size={18} />
-              {label}
+              <span className="dash-nav__label">{label}</span>
+              {t === '/orders' && kitchen.newCount > 0 && (
+                <span className="nav-badge" aria-label={`${kitchen.newCount} new`}>
+                  {kitchen.newCount}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
@@ -178,8 +201,7 @@ function Restaurant({ me, rid, tab }) {
       </aside>
 
       <main className="dash-main">
-        <header className="dash-top">
-          <h1>{title}</h1>
+        <PageHead title={title} subtitle={SUBTITLE[tab](restaurant)}>
           {canToggle && (
             <label className="open-toggle">
               <span>{restaurant.status === 'active' ? 'Accepting orders' : 'Paused'}</span>
@@ -189,7 +211,8 @@ function Restaurant({ me, rid, tab }) {
               </span>
             </label>
           )}
-        </header>
+          {!canToggle && <StatusPill status={restaurant.status} />}
+        </PageHead>
 
         {restaurant.status === 'pending' && (
           <div className="notice notice--info dash-banner">
@@ -197,16 +220,31 @@ function Restaurant({ me, rid, tab }) {
           </div>
         )}
 
-        {tab === '' && (
-          <>
-            <TodayStats today={today} />
-            <OrdersBoard restaurant={restaurant} onTodayChange={refreshToday} />
-            <TodayHistory today={today} />
-          </>
-        )}
+        {tab === '' && <Overview restaurant={restaurant} today={today} kitchen={kitchen} base={base} />}
+        {tab === '/orders' && <OrdersPage restaurant={restaurant} today={today} kitchen={kitchen} />}
         {tab === '/menu' && <MenuEditor restaurant={restaurant} />}
         {tab === '/settings' && <Settings restaurant={restaurant} onChange={setRestaurant} />}
       </main>
     </div>
+  );
+}
+
+function OrdersPage({ restaurant, today, kitchen }) {
+  const [view, setView] = useState('live');
+  return (
+    <>
+      <div className="orders-switch">
+        <RangePicker
+          label="Which orders"
+          value={view}
+          onChange={setView}
+          ranges={[
+            ['live', `Live board${kitchen.orders ? ` · ${kitchen.orders.length}` : ''}`],
+            ['history', `Today’s history${today ? ` · ${today.history.length}` : ''}`],
+          ]}
+        />
+      </div>
+      {view === 'live' ? <OrdersBoard restaurant={restaurant} kitchen={kitchen} /> : <OrderHistory today={today} />}
+    </>
   );
 }

@@ -59,6 +59,11 @@ export default function Header({ addressId, setAddressId, cartCount, me, activeO
                 <Link to="/dashboard">Dashboard</Link>
               </li>
             )}
+            {me?.user?.role === 'admin' && (
+              <li>
+                <Link to="/admin">Admin</Link>
+              </li>
+            )}
             {me && (
               <li>
                 {me.user ? <Link to="/account">Account</Link> : <Link to="/signin">Sign In</Link>}

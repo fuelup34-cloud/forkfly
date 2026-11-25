@@ -1,0 +1,22 @@
+/* Admin-only bits. The shared dashboard styles are in src/ui/console.css. */
+
+.admin-sample-note {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-alt);
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.admin-sample-note svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+@media (max-width: 860px) {
+  .admin-sample-note {
+    display: none;
+  }
+}

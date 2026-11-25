@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PREP_CHOICES, formatMoney, toRealMinutes } from '../../shared/core.js';
 import { dash } from '../api.js';
-import { load, store } from '../storage.js';
 import Icon from '../components/Icon.jsx';
-import { chime, enableChime, useBoard, useTicker } from './useBoard.js';
+import { useTicker } from './useBoard.js';
 
 const ACCEPT_WITHIN_MS = 10 * 60 * 1000; // matches the server
 const DECLINE_REASONS = [
@@ -22,32 +21,9 @@ const clock = (ms) => {
 };
 const nearestPrep = (m) => PREP_CHOICES.reduce((best, c) => (Math.abs(c - m) < Math.abs(best - m) ? c : best), PREP_CHOICES[1]);
 
-function useSound() {
-  const [on, setOn] = useState(() => load('forkfly-dash-sound', false));
-  // Browsers only allow sound after a tap, so the saved choice takes effect on the first tap.
-  useEffect(() => {
-    if (!on) return undefined;
-    const wake = () => enableChime().catch(() => {});
-    wake();
-    window.addEventListener('pointerdown', wake, { once: true });
-    return () => window.removeEventListener('pointerdown', wake);
-  }, [on]);
-  const toggle = async () => {
-    const next = !on;
-    setOn(next);
-    store('forkfly-dash-sound', next);
-    if (next) {
-      await enableChime().catch(() => {});
-      chime();
-    }
-  };
-  return [on, toggle];
-}
-
-export default function OrdersBoard({ restaurant, onTodayChange }) {
-  const { orders, error, live, update, serverNow } = useBoard(restaurant.id);
-  const [sound, toggleSound] = useSound();
-  const seen = useRef(null);
+// `kitchen` comes from useKitchen in the dashboard shell (live orders, sound, alerts).
+export default function OrdersBoard({ restaurant, kitchen }) {
+  const { orders, error, live, update, serverNow, sound, toggleSound } = kitchen;
   useTicker(1000);
 
   const groups = useMemo(() => {
@@ -57,24 +33,6 @@ export default function OrdersBoard({ restaurant, onTodayChange }) {
     g.preparing.sort((a, b) => a.readyBy - b.readyBy);
     return g;
   }, [orders]);
-
-  // A chime and a tab title when a new order comes in.
-  useEffect(() => {
-    if (!orders) return;
-    const ids = new Set(orders.filter((o) => o.status === 'new').map((o) => o.id));
-    if (seen.current && [...ids].some((id) => !seen.current.has(id)) && sound) chime();
-    seen.current = ids;
-    document.title = ids.size ? `(${ids.size}) New order${ids.size > 1 ? 's' : ''} · Forkfly` : 'Orders · Forkfly';
-    return () => {
-      document.title = 'Forkfly';
-    };
-  }, [orders, sound]);
-
-  // When an order leaves the board, today's totals have changed.
-  const count = orders?.length;
-  useEffect(() => {
-    if (count != null) onTodayChange();
-  }, [count, onTodayChange]);
 
   const now = serverNow();
   const act = async (order, action, body) => {
@@ -87,11 +45,16 @@ export default function OrdersBoard({ restaurant, onTodayChange }) {
       <div className="board__bar">
         <span className={`live-chip ${live ? '' : 'is-off'}`}>
           <span className="live-dot" aria-hidden="true" />
-          {live ? 'Live' : 'Reconnecting…'}
+          {live ? 'Live — updates by itself' : 'Reconnecting…'}
         </span>
-        <button type="button" className={`btn btn--outline btn--sm ${sound ? 'is-on' : ''}`} onClick={toggleSound} aria-pressed={sound}>
-          {sound ? 'Sound on' : 'Turn on sound'}
-        </button>
+        <label className="sound-toggle">
+          <span>{sound ? 'Chime on' : 'Chime off'}</span>
+          <span className="switch">
+            <input type="checkbox" checked={sound} onChange={toggleSound} />
+            <span className="switch__track" aria-hidden="true" />
+          </span>
+          <span className="visually-hidden">Play a chime for new orders</span>
+        </label>
       </div>
       {error && (
         <p className="notice notice--error" role="alert">
@@ -134,6 +97,7 @@ function Column({ title, count, tone, empty, children }) {
   return (
     <section className={`board-col board-col--${tone}`} aria-label={title}>
       <h2 className="board-col__head">
+        <span className="board-col__dot" aria-hidden="true" />
         {title} <span className={`board-col__count ${count ? 'has-items' : ''}`}>{count}</span>
       </h2>
       <div className="board-col__list">{count ? children : <p className="board-col__empty">{empty}</p>}</div>
