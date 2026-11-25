@@ -4,7 +4,7 @@ import CityMap from './CityMap.jsx';
 
 // A pretend order that replays forever, so the hero shows live tracking in action.
 function demoOrder(start) {
-  const restaurant = { id: 'demo', name: 'Slice Theory', emoji: '🍕', x: 400, y: 500 };
+  const restaurant = { id: 'demo', name: 'Slice Theory', x: 400, y: 500 };
   const address = { id: 'home', label: 'Home', line: '12 Maple Street', x: 800, y: 700 };
   const courierStart = { x: 300, y: 300 };
   const pickupPath = routeBetween(courierStart, restaurant);
@@ -65,7 +65,7 @@ export default function HeroPhone() {
           <div className="progress">
             <span style={{ width: `${snap.progress * 100}%` }} />
           </div>
-          <p className="phone__courier">🍕 Slice Theory · Priya on an e-bike</p>
+          <p className="phone__courier">Slice Theory · Priya on an e-bike</p>
         </div>
       </div>
     </div>

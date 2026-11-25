@@ -4,16 +4,100 @@ A food delivery app with low, clearly explained fees and live courier tracking.
 
 ## Run it
 
+You need Node 22+ and PostgreSQL running locally (`brew services start postgresql@14`).
+
 ```bash
 npm install
+npm run setup  # writes .env with a fresh secret, creates the database, loads demo data and test accounts
 npm run cert   # needed for phone GPS; re-run when your computer's IP changes
-npm start      # builds, then serves the app on port 5190 (and HTTPS on 5443)
+npm start      # builds, migrates, then serves the app on port 5190 (and HTTPS on 5443)
 ```
 
 Open http://localhost:5190, or `http://<your-computer's-IP>:5190` on a phone on the same Wi-Fi.
 
 `npm run dev` is for editing and only works on this computer: the Vite 5 dev server has known
 vulnerabilities, so don't add `--host` to it.
+
+## Test accounts
+
+`npm run setup` (or `npm run seed:dev` on its own) creates these in **your local database only**.
+They all use the password `forkfly-test-2026`:
+
+| Email | What it can do |
+| --- | --- |
+| `admin@example.com` | Forkfly admin |
+| `owner@example.com` | Owner of Mama's Kitchen: the full restaurant dashboard |
+| `staff@example.com` | Staff at Mama's Kitchen: orders, pausing, marking items sold out |
+| `rider@example.com` | Approved rider |
+| `customer@example.com` | Customer only |
+
+To see the dashboard at work, sign in as `customer@example.com` in one browser and order from
+Mama's Kitchen, and as `owner@example.com` in another (or a private window) at `/dashboard`.
+
+This repository is public, so these logins are public too. Never create them on a real server
+(the script refuses when `NODE_ENV=production`).
+
+## Accounts
+
+Anyone can browse. Placing and tracking orders needs an account (email and password).
+When signing up, people choose what they're here for:
+
+- **Order food**: a customer account.
+- **Run a restaurant**: also creates the restaurant as *pending*. It's hidden until approved and has a menu.
+- **Deliver**: also creates a *pending* rider.
+
+A signed-in customer can apply later from **Account → Work with Forkfly**.
+Until the admin dashboard exists, approvals happen in the terminal:
+
+```bash
+npm run manage -- list                                   # restaurants, staff, riders, admins
+npm run manage -- make-admin you@example.com
+npm run manage -- approve-restaurant <restaurant-id>
+npm run manage -- approve-rider rider@example.com
+npm run manage -- own-restaurant <restaurant-id>         # mark one as Forkfly's own
+npm run manage -- add-member <restaurant-id> <email> [owner|staff]
+npm run manage -- add-rider <email> [vehicle]
+```
+
+## Restaurant dashboard
+
+Restaurant teams open **/dashboard** (linked from the header and their account page):
+
+- **Orders**: a live board with **New → Preparing → Ready for pickup**. New orders chime (turn
+  sound on once) and show in the tab title. Accept with a prep time, decline with a reason, add
+  5 minutes, or mark ready. Unanswered orders are declined automatically after 10 minutes, so
+  customers never wait for food that isn't coming. Today's orders, sales and history sit alongside.
+- **Menu**: add, edit and delete items with photos, and switch items to sold out.
+- **Settings**: cover photo, name, cuisine, description, usual prep time, price range, and the team.
+- The **Accepting orders** switch pauses the restaurant. Customers see it as closed.
+
+Owners can change everything. Staff can run orders, pause the restaurant and mark items sold out.
+Restaurants with a team run their own kitchen. The demo restaurants (no team) run themselves.
+Once a restaurant has a member (`npm run manage -- add-member pho-corner you@example.com owner`),
+its new orders wait for that team.
+
+Photos are shrunk in the browser (longest side 1600 px for covers, 1200 px for dishes), checked
+on the server to be real JPEG, PNG or WebP files, and stored in `server/uploads/`. That folder
+is not in git, so back it up or move to object storage before hosting. The demo restaurants'
+covers are hotlinked from Unsplash, which is free to use under the Unsplash License. Menu items
+only show photos the restaurant uploads.
+
+## Database
+
+Postgres, with [Drizzle](https://orm.drizzle.team) for the schema and queries, and
+[Better Auth](https://www.better-auth.com) for sign-in. The tables are defined in `server/db/schema.js`:
+
+| Table | Holds |
+| --- | --- |
+| `user`, `session`, `account`, `verification` | Accounts and sign-in (password hashes live in `account`) |
+| `restaurant`, `menu_item` | Restaurants (`status`, `is_own`, cover photo, time zone) and their menus |
+| `restaurant_member` | Who can manage which restaurant (owner or staff) |
+| `rider` | Riders and their approval status |
+| `order` | Orders, with snapshots of the items, prices and address at the time, and why one was declined |
+
+After changing the schema, run `npm run db:generate` to write a migration, then `npm run db:migrate`
+(`npm start` migrates automatically). `npm run db:studio` opens a browser view of the data.
+`npm run db:seed` re-applies `server/restaurants.js` without deleting anything.
 
 ## Real GPS
 
@@ -28,17 +112,24 @@ which reveals the approximate area being viewed to them. Their public tiles aren
 
 ## How it works
 
-- `server/index.js` — Node server. Restaurant menus, orders, and a WebSocket (`/ws`) that sends each
-  order's live status and courier position twice a second. It always recalculates prices itself.
-- `server/restaurants.js` — the demo restaurants and couriers.
+- `server/index.js` — Node server: routing, accounts, and the WebSocket (`/ws`) that sends customers
+  their order twice a second and kitchens their live board. Requests that change something are
+  only accepted from the app's own pages.
+- `server/orders.js` — placing orders (prices always recalculated here) and the kitchen's steps.
+- `server/dashboard.js` — the restaurant dashboard API, with owner/staff permissions.
+- `server/catalog.js`, `server/uploads.js`, `server/http.js` — menus, photos, request helpers.
+- `server/auth.js` — sign-in setup, and the list of addresses allowed to use it.
+- `server/db/` — schema, migrations, seeding.
+- `server/restaurants.js` — the demo restaurants (seed data) and simulated couriers.
 - `shared/core.js` — fees, map routes and the delivery timeline, used by both server and app so they agree.
 - `src/` — the React app: browse → menu → checkout → live tracking → order history.
+- `src/dashboard/` — the restaurant dashboard, loaded only by people who open it.
 
 ## Fees
 
 | Fee | Amount |
 | --- | --- |
-| Delivery | $0.99 for the first 2 km, then $0.40/km, never more than $3.99 |
+| Delivery | $0.99 for the first mile, then $0.65 a mile, never more than $3.99 |
 | Service | 5% of the items, never more than $2.50 |
 | Small order | $1.00, only on orders under $10 |
 | Tip | optional, 100% to the courier |
@@ -49,8 +140,8 @@ This is a working demo, not a live service:
 
 - The city, restaurants, prices and couriers are made up. Without real GPS, couriers move along a drawn street grid.
 - Time runs 30× faster, so a ~20 minute delivery takes about 40 seconds to watch.
-- No payment is taken. You only see your own orders (tied to your browser), but there are no accounts.
-- Orders are saved to `server/data.json`.
+- No payment is taken.
+- There's no email yet, so addresses aren't verified and there's no password reset.
 
-Making it real would need payments, accounts, restaurant partners, courier dispatch and sign-in, real addresses
-with routing and ETAs, a native courier app for background GPS, a database, and public hosting.
+Making it real would still need payments, restaurant and rider dashboards, courier dispatch, email, real addresses
+with routing and ETAs, a native courier app for background GPS, and public hosting.

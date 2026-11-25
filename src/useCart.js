@@ -13,13 +13,13 @@ export function useCart() {
 
   function setQty(restaurant, item, qty) {
     setCart((c) => {
-      const base = c.restaurant?.id === restaurant.id ? c : { restaurant: { id: restaurant.id, name: restaurant.name, emoji: restaurant.emoji }, lines: [] };
+      const base = c.restaurant?.id === restaurant.id ? c : { restaurant: { id: restaurant.id, name: restaurant.name, colors: restaurant.colors }, lines: [] };
       const next = [...base.lines];
       const i = next.findIndex((l) => l.id === item.id);
       if (qty <= 0) {
         if (i >= 0) next.splice(i, 1);
       } else {
-        const line = { id: item.id, name: item.name, emoji: item.emoji, price: item.price, qty: Math.min(20, qty) };
+        const line = { id: item.id, name: item.name, price: item.price, qty: Math.min(20, qty) };
         if (i >= 0) next[i] = line;
         else next.push(line);
       }

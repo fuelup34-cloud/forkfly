@@ -4,18 +4,29 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n server,web -c green,cyan \"node --watch server/index.js\" \"vite\"",
+    "setup": "node scripts/setup.js",
+    "dev": "concurrently -k -n server,web -c green,cyan \"node --env-file=.env --watch server/index.js\" \"vite\"",
     "build": "vite build",
-    "start": "vite build && PORT=5190 node server/index.js",
-    "cert": "sh scripts/cert.sh"
+    "start": "vite build && node --env-file=.env server/db/migrate.js && PORT=5190 node --env-file=.env server/index.js",
+    "cert": "sh scripts/cert.sh",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file=.env server/db/migrate.js",
+    "db:seed": "node --env-file=.env server/db/seed.js",
+    "db:studio": "node --env-file=.env node_modules/drizzle-kit/bin.cjs studio",
+    "manage": "node --env-file=.env scripts/manage.js",
+    "seed:dev": "node --env-file=.env scripts/seed-dev.js"
   },
   "dependencies": {
+    "better-auth": "1.7.20",
+    "drizzle-orm": "0.45.4",
     "leaflet": "^1.9.4",
+    "pg": "8.23.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.0",
+    "drizzle-kit": "0.31.11",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "vite": "^5.4.11"

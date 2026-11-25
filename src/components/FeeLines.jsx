@@ -1,10 +1,10 @@
-import { FEES, formatMoney } from '../../shared/core.js';
+import { FEES, formatMiles, formatMoney } from '../../shared/core.js';
 
 // Every fee, spelled out, with why it's there.
 export default function FeeLines({ pricing, km }) {
   const rows = [
     ['Items', pricing.subtotal, 'Same prices as in the restaurant.'],
-    ['Delivery', pricing.delivery, km != null ? `${km} km. ${formatMoney(FEES.deliveryBase)} covers the first ${FEES.includedKm} km.` : null],
+    ['Delivery', pricing.delivery, km != null ? `${formatMiles(km)}. ${formatMoney(FEES.deliveryBase)} covers the first mile, then ${formatMoney(FEES.perExtraMile)} a mile.` : null],
     ['Service fee', pricing.service, `${FEES.serviceRate * 100}% of items, never more than ${formatMoney(FEES.serviceCap)}.`],
   ];
   if (pricing.smallOrder) rows.push(['Small order fee', pricing.smallOrder, `Only on orders under ${formatMoney(FEES.smallOrderUnder)}.`]);

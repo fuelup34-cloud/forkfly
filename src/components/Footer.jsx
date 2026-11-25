@@ -13,7 +13,7 @@ export default function Footer() {
       <div className="container">
         <p className="footer__note">
           Forkfly is a demo. Restaurants, couriers and prices are made up, and no payment is taken. Delivery is{' '}
-          {formatMoney(FEES.deliveryBase)} for the first {FEES.includedKm} km and never more than {formatMoney(FEES.deliveryCap)}.
+          {formatMoney(FEES.deliveryBase)} for the first mile and never more than {formatMoney(FEES.deliveryCap)}.
         </p>
         <div className="footer__cols">
           <div>

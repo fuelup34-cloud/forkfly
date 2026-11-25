@@ -4,6 +4,8 @@ import { api } from '../api.js';
 import { Link } from '../router.jsx';
 import { goToSection } from '../sections.js';
 import HeroPhone from './HeroPhone.jsx';
+import Monogram from './Monogram.jsx';
+import RestaurantCard from './RestaurantCard.jsx';
 
 const SORTS = [
   ['recommended', 'Recommended'],
@@ -94,9 +96,7 @@ export default function Home({ addressId, activeOrder }) {
         <div className="container-wide">
           {activeOrder && (
             <Link to={`/orders/${activeOrder.id}`} className="active-banner">
-              <span className="active-banner__emoji" aria-hidden="true">
-                {activeOrder.restaurant.emoji}
-              </span>
+              <Monogram name={activeOrder.restaurant.name} colors={activeOrder.restaurant.colors} image={activeOrder.restaurant.coverImage} />
               <span>
                 <strong>Your {activeOrder.restaurant.name} order is on its way.</strong>
                 <span>Follow it live</span>
@@ -144,28 +144,10 @@ export default function Home({ addressId, activeOrder }) {
             </p>
           )}
 
-          <div className="grid">
-            {restaurants === null && !error && Array.from({ length: 6 }, (_, i) => <div key={i} className="card card--skeleton" aria-hidden="true" />)}
+          <div className="rgrid">
+            {restaurants === null && !error && Array.from({ length: 8 }, (_, i) => <div key={i} className="rcard rcard--skeleton" aria-hidden="true" />)}
             {shown.map((r) => (
-              <Link key={r.id} to={`/r/${r.id}`} className="card">
-                <div className="card__cover" style={{ background: `linear-gradient(135deg, ${r.colors[0]}, ${r.colors[1]})` }}>
-                  <span aria-hidden="true">{r.emoji}</span>
-                  <em className="card__eta">
-                    {r.eta[0]}–{r.eta[1]} min
-                  </em>
-                </div>
-                <div className="card__body">
-                  <h3>{r.name}</h3>
-                  <p className="muted">
-                    {r.cuisine} · {'$'.repeat(r.priceLevel)} · {r.km} km
-                  </p>
-                  <p className="card__meta">
-                    <span className="rating">★ {r.rating.toFixed(1)}</span>
-                    <span className="muted">({r.reviews.toLocaleString()})</span>
-                    <span className="fee">{formatMoney(r.deliveryFee)} delivery</span>
-                  </p>
-                </div>
-              </Link>
+              <RestaurantCard key={r.id} r={r} />
             ))}
           </div>
           {restaurants && shown.length === 0 && <p className="empty-line">Nothing matches “{query || cuisine}”. Try another search.</p>}
@@ -199,7 +181,7 @@ export default function Home({ addressId, activeOrder }) {
           <div className="stats__grid">
             <div>
               <p className="stat__value">{formatMoney(FEES.deliveryBase)}</p>
-              <p className="stat__label">delivery for the first {FEES.includedKm} km</p>
+              <p className="stat__label">delivery for the first {FEES.includedMiles === 1 ? 'mile' : `${FEES.includedMiles} miles`}</p>
             </div>
             <div>
               <p className="stat__value">{formatMoney(FEES.deliveryCap)}</p>
@@ -220,7 +202,7 @@ export default function Home({ addressId, activeOrder }) {
         <div className="container">
           <div className="getstarted__card text-center">
             <h2 className="headline">Hungry yet?</h2>
-            <p className="lede getstarted__sub">Nine kitchens, one live map.</p>
+            <p className="lede getstarted__sub">Local kitchens, one live map.</p>
             <div className="cta-row">
               <a href="/#restaurants" className="btn btn--light" onClick={jump('restaurants')}>
                 Find food

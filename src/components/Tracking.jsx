@@ -1,6 +1,9 @@
 import { Suspense, lazy, useState } from 'react';
 import { STEPS, TIME_SCALE, formatMoney, toRealMinutes } from '../../shared/core.js';
-import { api } from '../api.js';
+import { api, signInLink } from '../api.js';
+import Icon from './Icon.jsx';
+import Monogram from './Monogram.jsx';
+import { useConfirm } from './ConfirmDialog.jsx';
 import { useLiveOrder } from '../useLiveOrder.js';
 import { Link } from '../router.jsx';
 import CityMap from './CityMap.jsx';
@@ -13,15 +16,17 @@ function headline(o) {
   const c = o.courier.name.split(' ')[0];
   switch (o.status) {
     case 'placed':
-      return `Sending your order to ${o.restaurant.name}…`;
+      return o.timeline.manual ? `Waiting for ${o.restaurant.name} to confirm your order` : `Sending your order to ${o.restaurant.name}…`;
     case 'preparing':
       return o.courierPhase === 'at_restaurant' ? `${c} is waiting while your food is finished` : `${o.restaurant.name} is preparing your food`;
     case 'ready':
-      return `Your food is ready — ${c} is almost at the restaurant`;
+      return o.courierPhase === 'at_restaurant' ? `${c} is picking up your food` : `Your food is ready — ${c} is almost at the restaurant`;
     case 'on_the_way':
       return o.almostThere ? `${c} is arriving now` : `${c} is on the way with your food`;
     case 'delivered':
       return 'Delivered. Enjoy your meal!';
+    case 'rejected':
+      return `${o.restaurant.name} couldn’t take your order`;
     default:
       return 'Order cancelled';
   }
@@ -29,14 +34,26 @@ function headline(o) {
 
 const stepIndex = (status) => ({ placed: 0, preparing: 1, ready: 1, on_the_way: 2, delivered: 3 })[status] ?? -1;
 
-export default function Tracking({ id }) {
-  const { order, setOrder, error, live } = useLiveOrder(id);
+export default function Tracking({ id, me }) {
+  const { order, setOrder, error, live } = useLiveOrder(id, !!me?.user);
   const [cancelError, setCancelError] = useState('');
+  const [dialog, ask] = useConfirm();
+
+  if (me && !me.user)
+    return (
+      <div className="empty">
+        <Icon name="receipt" size={48} className="empty__icon" />
+        <h1>Sign in to follow your order</h1>
+        <Link to={signInLink()} className="btn">
+          Sign in
+        </Link>
+      </div>
+    );
 
   if (error && !order)
     return (
       <div className="empty">
-        <p className="empty__emoji">🔎</p>
+        <Icon name="search" size={48} className="empty__icon" />
         <h1>{error}</h1>
         <Link to="/orders" className="btn">
           Your orders
@@ -62,7 +79,8 @@ export default function Tracking({ id }) {
   }
 
   async function cancel() {
-    if (!window.confirm('Cancel this order?')) return;
+    const ok = await ask({ title: 'Cancel this order?', body: 'You won’t be charged.', confirm: 'Cancel order', cancel: 'Keep order', danger: true });
+    if (!ok) return;
     setCancelError('');
     try {
       setOrder(await api.cancel(order.id));
@@ -73,6 +91,7 @@ export default function Tracking({ id }) {
 
   return (
     <div className="page tracking">
+      {dialog}
       <div className="map-wrap">
         {order.gps && order.active ? (
           <Suspense fallback={null}>
@@ -99,7 +118,16 @@ export default function Tracking({ id }) {
             </p>
           )}
           <h1>{headline(order)}</h1>
-          {order.status !== 'cancelled' && (
+          {order.status === 'rejected' && (
+            <p className="muted">
+              {order.rejectReason}. You haven’t been charged.{' '}
+              <Link to="/" className="text-link">
+                Find another restaurant
+              </Link>
+            </p>
+          )}
+          {order.status === 'placed' && order.timeline.manual && <p className="muted">Restaurants usually confirm within a couple of minutes.</p>}
+          {order.status !== 'cancelled' && order.status !== 'rejected' && (
             <>
               <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(order.progress * 100)} aria-label="Delivery progress">
                 <span style={{ width: `${order.progress * 100}%` }} />
@@ -138,7 +166,7 @@ export default function Tracking({ id }) {
           </button>
         )}
 
-        {order.courierPos && order.status !== 'cancelled' && (
+        {order.courierPos && order.active && (
           <section className="panel courier">
             <span className="courier__avatar" aria-hidden="true">
               {order.courier.name[0]}
@@ -153,8 +181,9 @@ export default function Tracking({ id }) {
         )}
 
         <section className="panel">
-          <h2>
-            {order.restaurant.emoji} {order.restaurant.name} <span className="muted small">#{order.id}</span>
+          <h2 className="with-mono">
+            <Monogram name={order.restaurant.name} colors={order.restaurant.colors} image={order.restaurant.coverImage} size="sm" />
+            {order.restaurant.name} <span className="muted small">#{order.id}</span>
           </h2>
           <p className="muted small">
             To {order.address.label}, {order.address.line}

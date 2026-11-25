@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ADDRESSES, TIP_OPTIONS, distanceKm, formatMoney, priceBreakdown } from '../../shared/core.js';
-import { api } from '../api.js';
+import { api, signInLink } from '../api.js';
+import Icon from './Icon.jsx';
+import Monogram from './Monogram.jsx';
 import { Link, navigate } from '../router.jsx';
 import FeeLines from './FeeLines.jsx';
 import QtyStepper from './QtyStepper.jsx';
 
-export default function Checkout({ cart, addressId, setAddressId }) {
+export default function Checkout({ cart, addressId, setAddressId, me }) {
   const [restaurant, setRestaurant] = useState(null);
   const [tip, setTip] = useState(200);
   const [note, setNote] = useState('');
@@ -22,7 +24,7 @@ export default function Checkout({ cart, addressId, setAddressId }) {
   if (!cartRestaurant)
     return (
       <div className="empty">
-        <p className="empty__emoji">🛍️</p>
+        <Icon name="bag" size={48} className="empty__icon" />
         <h1>Your cart is empty</h1>
         <p className="muted">Pick a restaurant and add a few things.</p>
         <Link to="/" className="btn">
@@ -32,7 +34,7 @@ export default function Checkout({ cart, addressId, setAddressId }) {
     );
 
   const address = ADDRESSES.find((a) => a.id === addressId);
-  const km = restaurant ? Math.round(distanceKm(restaurant, address) * 10) / 10 : null;
+  const km = restaurant ? distanceKm(restaurant, address) : null;
   const pricing = priceBreakdown({ subtotal: cart.subtotal, km: km ?? 0, tip });
 
   async function placeOrder() {
@@ -83,15 +85,13 @@ export default function Checkout({ cart, addressId, setAddressId }) {
           </section>
 
           <section className="panel">
-            <h2>
-              {cartRestaurant.emoji} {cartRestaurant.name}
+            <h2 className="with-mono">
+              <Monogram name={cartRestaurant.name} colors={cartRestaurant.colors} image={restaurant?.coverImage} size="sm" />
+              {cartRestaurant.name}
             </h2>
             <ul className="lines">
               {lines.map((l) => (
                 <li key={l.id}>
-                  <span className="lines__emoji" aria-hidden="true">
-                    {l.emoji}
-                  </span>
                   <span className="lines__name">
                     {l.name}
                     <span className="muted">{formatMoney(l.price)} each</span>
@@ -124,9 +124,15 @@ export default function Checkout({ cart, addressId, setAddressId }) {
               {error}
             </p>
           )}
-          <button type="button" className="btn btn--block btn--big" onClick={placeOrder} disabled={busy || !restaurant}>
-            {busy ? 'Placing order…' : `Place order · ${formatMoney(pricing.total)}`}
-          </button>
+          {me && !me.user ? (
+            <Link to={signInLink('/checkout')} className="btn btn--block btn--big">
+              Sign in to place your order
+            </Link>
+          ) : (
+            <button type="button" className="btn btn--block btn--big" onClick={placeOrder} disabled={busy || !restaurant || !me}>
+              {busy ? 'Placing order…' : `Place order · ${formatMoney(pricing.total)}`}
+            </button>
+          )}
           <p className="muted small center">Demo checkout: no payment is taken.</p>
         </aside>
       </div>

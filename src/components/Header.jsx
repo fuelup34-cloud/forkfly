@@ -24,7 +24,7 @@ function useNarrow() {
 }
 
 // Two bars, like Strawberry Pay: a thin global bar, then a sticky bar for the current page.
-export default function Header({ addressId, setAddressId, cartCount, activeOrder, path, title }) {
+export default function Header({ addressId, setAddressId, cartCount, me, activeOrder, path, title }) {
   const [open, setOpen] = useState(false);
   const narrow = useNarrow();
   useEffect(() => setOpen(false), [path]);
@@ -54,6 +54,16 @@ export default function Header({ addressId, setAddressId, cartCount, activeOrder
             <li>
               <Link to="/orders">Your Orders</Link>
             </li>
+            {me?.restaurants?.length > 0 && (
+              <li>
+                <Link to="/dashboard">Dashboard</Link>
+              </li>
+            )}
+            {me && (
+              <li>
+                {me.user ? <Link to="/account">Account</Link> : <Link to="/signin">Sign In</Link>}
+              </li>
+            )}
           </ul>
           <div className="globalnav__end">
             <ThemeToggle />

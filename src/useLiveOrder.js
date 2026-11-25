@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { api, deviceId } from './api.js';
+import { api } from './api.js';
 
 // Follows one order live. The server pushes a fresh snapshot (status, courier position, ETA)
 // twice a second over a WebSocket. If the connection drops, it reconnects by itself.
-export function useLiveOrder(orderId) {
+export function useLiveOrder(orderId, signedIn = true) {
   const [order, setOrder] = useState(null);
   const [error, setError] = useState('');
   const [live, setLive] = useState(false);
 
   useEffect(() => {
+    if (!signedIn) return undefined;
     let ws;
     let retryTimer;
     let attempts = 0;
@@ -24,7 +25,7 @@ export function useLiveOrder(orderId) {
       ws.onopen = () => {
         attempts = 0;
         setLive(true);
-        ws.send(JSON.stringify({ type: 'watch', orderId, deviceId }));
+        ws.send(JSON.stringify({ type: 'watch', orderId }));
       };
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data);
@@ -44,7 +45,7 @@ export function useLiveOrder(orderId) {
       clearTimeout(retryTimer);
       ws?.close();
     };
-  }, [orderId]);
+  }, [orderId, signedIn]);
 
   return { order, setOrder, error, live };
 }

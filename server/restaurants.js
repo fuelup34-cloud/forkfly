@@ -1,11 +1,14 @@
-// Demo restaurants. Positions are street corners on the 1000 × 1000 city grid.
+// Demo restaurants. Cover photos are from Unsplash (free to use under the Unsplash License).
+// Positions are street corners on the 1000 × 1000 city grid.
 // prepMin is the usual real-life kitchen time. Prices are in cents.
 
 export const RESTAURANTS = [
   {
     id: 'ember-oak',
+    cover: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd',
     name: 'Ember & Oak',
     cuisine: 'BBQ',
+    description: "Texas-style barbecue smoked low and slow over post oak, with scratch-made sides.",
     emoji: '🍖',
     colors: ['#f97316', '#b45309'],
     rating: 4.8,
@@ -25,8 +28,10 @@ export const RESTAURANTS = [
   },
   {
     id: 'pho-corner',
+    cover: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43',
     name: 'Pho Corner',
     cuisine: 'Vietnamese',
+    description: "Family recipes from Hanoi: bone broth simmered overnight, fresh herbs, crusty banh mi.",
     emoji: '🍜',
     colors: ['#ef4444', '#991b1b'],
     rating: 4.7,
@@ -46,8 +51,10 @@ export const RESTAURANTS = [
   },
   {
     id: 'slice-theory',
+    cover: 'https://images.unsplash.com/photo-1513104890138-7c749659a591',
     name: 'Slice Theory',
     cuisine: 'Pizza',
+    description: "Naturally leavened pies baked hot and fast, with toppings from local farms.",
     emoji: '🍕',
     colors: ['#eab308', '#c2410c'],
     rating: 4.6,
@@ -67,8 +74,10 @@ export const RESTAURANTS = [
   },
   {
     id: 'green-bowl',
+    cover: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd',
     name: 'Green Bowl Co.',
     cuisine: 'Healthy',
+    description: "Grain bowls, salads and cold-pressed juices that taste as good as they look.",
     emoji: '🥗',
     colors: ['#22c55e', '#15803d'],
     rating: 4.7,
@@ -87,8 +96,10 @@ export const RESTAURANTS = [
   },
   {
     id: 'taco-loco',
+    cover: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47',
     name: 'Tres Tacos',
     cuisine: 'Mexican',
+    description: "Street-style tacos on handmade corn tortillas, with salsas made daily.",
     emoji: '🌮',
     colors: ['#f43f5e', '#7c2d12'],
     rating: 4.9,
@@ -108,8 +119,10 @@ export const RESTAURANTS = [
   },
   {
     id: 'kumo-sushi',
+    cover: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c',
     name: 'Kumo Sushi',
     cuisine: 'Japanese',
+    description: "Nigiri, rolls and bowls made to order with fish delivered fresh each morning.",
     emoji: '🍣',
     colors: ['#0ea5e9', '#1e3a8a'],
     rating: 4.8,
@@ -129,8 +142,10 @@ export const RESTAURANTS = [
   },
   {
     id: 'morning-crumb',
+    cover: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a',
     name: 'Morning Crumb',
     cuisine: 'Bakery',
+    description: "A neighborhood bakery for croissants, morning buns and good coffee.",
     emoji: '🥐',
     colors: ['#f59e0b', '#92400e'],
     rating: 4.6,
@@ -149,8 +164,10 @@ export const RESTAURANTS = [
   },
   {
     id: 'spice-route',
+    cover: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641',
     name: 'Spice Route',
     cuisine: 'Indian',
+    description: "Regional Indian cooking, from smoky tandoor dishes to slow-cooked curries.",
     emoji: '🍛',
     colors: ['#d97706', '#7f1d1d'],
     rating: 4.7,
@@ -170,8 +187,10 @@ export const RESTAURANTS = [
   },
   {
     id: 'patty-lab',
+    cover: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd',
     name: 'Patty Lab',
     cuisine: 'Burgers',
+    description: "Smashed burgers on toasted potato buns, crinkle fries and thick shakes.",
     emoji: '🍔',
     colors: ['#a855f7', '#4c1d95'],
     rating: 4.5,

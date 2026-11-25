@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { ADDRESSES } from '../shared/core.js';
 import { useRoute } from './router.jsx';
 import { useCart } from './useCart.js';
@@ -11,6 +11,13 @@ import Checkout from './components/Checkout.jsx';
 import Tracking from './components/Tracking.jsx';
 import Orders from './components/Orders.jsx';
 import Courier from './components/Courier.jsx';
+import SignIn from './components/SignIn.jsx';
+import Account from './components/Account.jsx';
+import Apply from './components/Apply.jsx';
+import Icon from './components/Icon.jsx';
+
+// Only restaurant teams need the dashboard, so customers never download it.
+const DashboardApp = lazy(() => import('./dashboard/DashboardApp.jsx'));
 import { Link } from './router.jsx';
 import Footer from './components/Footer.jsx';
 
@@ -26,14 +33,38 @@ export default function App() {
     store('forkfly-address', id);
   };
 
+  // Who's signed in, plus any restaurants they manage and their rider status.
+  // undefined while loading; { user: null } when signed out.
+  const [me, setMe] = useState(undefined);
+  const refreshMe = useCallback(
+    () =>
+      api
+        .me()
+        .then(setMe)
+        .catch(() => setMe((cur) => cur ?? { user: null, restaurants: [], rider: null })),
+    []
+  );
+  useEffect(() => {
+    refreshMe();
+  }, [refreshMe]);
+  const signedIn = !!me?.user;
+
   // Check for an order that's still on its way, so the header can link straight to it.
   const [activeOrder, setActiveOrder] = useState(null);
   useEffect(() => {
+    if (!signedIn) return setActiveOrder(null);
     api
       .orders()
       .then((list) => setActiveOrder(list.find((o) => o.active) ?? null))
       .catch(() => {});
-  }, [path]);
+  }, [path, signedIn]);
+
+  if (path === '/dashboard' || path.startsWith('/dashboard/'))
+    return (
+      <Suspense fallback={<div className="dash-loading" aria-label="Loading" />}>
+        <DashboardApp me={me} path={path} />
+      </Suspense>
+    );
 
   // Pick the page (and the title in the sticky bar) from the address.
   let page;
@@ -46,20 +77,29 @@ export default function App() {
     page = <RestaurantPage id={m[1]} addressId={addressId} cart={cart} />;
   } else if (path === '/checkout') {
     title = 'Checkout';
-    page = <Checkout cart={cart} addressId={addressId} setAddressId={setAddressId} />;
+    page = <Checkout cart={cart} addressId={addressId} setAddressId={setAddressId} me={me} />;
   } else if (path === '/orders') {
     title = 'Your Orders';
-    page = <Orders />;
+    page = <Orders me={me} />;
   } else if ((m = path.match(/^\/orders\/([\w-]+)$/))) {
     title = 'Track Order';
-    page = <Tracking id={m[1]} />;
+    page = <Tracking id={m[1]} me={me} />;
+  } else if (path === '/signin' || path === '/signup') {
+    title = path === '/signin' ? 'Sign In' : 'Create Account';
+    page = <SignIn key={path} mode={path.slice(1)} onSignedIn={refreshMe} />;
+  } else if (path === '/account') {
+    title = 'Account';
+    page = <Account me={me} onSignedOut={refreshMe} />;
+  } else if (path === '/apply') {
+    title = 'Work With Us';
+    page = <Apply me={me} onApplied={refreshMe} />;
   } else if ((m = path.match(/^\/courier\/([\w-]+)$/))) {
     title = 'Courier';
     page = <Courier id={m[1]} />;
   } else {
     page = (
       <div className="empty">
-        <p className="empty__emoji">🧭</p>
+        <Icon name="compass" size={48} className="empty__icon" />
         <h1>Page not found</h1>
         <Link to="/" className="btn">
           Back to restaurants
@@ -69,7 +109,7 @@ export default function App() {
   }
   return (
     <>
-      <Header addressId={addressId} setAddressId={setAddressId} cartCount={cart.count} activeOrder={activeOrder} path={path} title={title} />
+      <Header addressId={addressId} setAddressId={setAddressId} cartCount={cart.count} me={me} activeOrder={activeOrder} path={path} title={title} />
       <main className={path === '/' ? '' : 'main'}>{page}</main>
       <Footer />
     </>

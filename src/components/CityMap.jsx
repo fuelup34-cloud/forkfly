@@ -1,5 +1,7 @@
 import { memo } from 'react';
 import { CITY_SIZE, GRID } from '../../shared/core.js';
+import { ICON_PATHS } from './Icon.jsx';
+import { initials } from './Monogram.jsx';
 
 const PARKS = new Set(['2,3', '3,3', '6,1', '7,6', '1,8']);
 const BLOCKS = [];
@@ -42,13 +44,29 @@ function viewBoxFor(points) {
   return `${minX} ${minY} ${size} ${size}`;
 }
 
-function Pin({ x, y, emoji, label, className = '' }) {
+// An icon from Icon.jsx, centred on 0,0 inside a map marker.
+function MapIcon({ name, size }) {
+  const s = size / 24;
+  return (
+    <g className="map__icon" transform={`scale(${s}) translate(-12 -12)`}>
+      {ICON_PATHS[name].map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </g>
+  );
+}
+
+function Pin({ x, y, text, icon, label, className = '' }) {
   return (
     <g className={`map__pin ${className}`} transform={`translate(${x} ${y})`} role="img" aria-label={label}>
       <circle r="30" />
-      <text textAnchor="middle" dominantBaseline="central" fontSize="30">
-        {emoji}
-      </text>
+      {icon ? (
+        <MapIcon name={icon} size={34} />
+      ) : (
+        <text className="map__pin-text" textAnchor="middle" dominantBaseline="central">
+          {text}
+        </text>
+      )}
     </g>
   );
 }
@@ -59,7 +77,6 @@ export default function CityMap({ order }) {
   const done = status === 'delivered' || status === 'cancelled';
   // While waiting at the restaurant, stand just beside its pin so both stay visible.
   const nudge = courierPhase === 'at_restaurant' ? 34 : 0;
-  const vehicle = order.courier.vehicle === 'Bicycle' ? '🚲' : order.courier.vehicle === 'Scooter' ? '🛵' : '🚴';
 
   return (
     <svg className="map" viewBox={vb} preserveAspectRatio="xMidYMid slice" aria-label="Live delivery map">
@@ -67,16 +84,14 @@ export default function CityMap({ order }) {
       <City />
       {courierPhase === 'to_restaurant' && <polyline className="map__route map__route--pickup" points={pts(pickupPath)} />}
       {status !== 'cancelled' && <polyline className={`map__route ${done ? 'map__route--done' : ''}`} points={pts(dropPath)} />}
-      <Pin x={restaurant.x} y={restaurant.y} emoji={restaurant.emoji} label={restaurant.name} />
-      <Pin x={address.x} y={address.y} emoji="🏠" label={address.label} className="map__pin--home" />
+      <Pin x={restaurant.x} y={restaurant.y} text={initials(restaurant.name)} label={restaurant.name} />
+      <Pin x={address.x} y={address.y} icon="home" label={address.label} className="map__pin--home" />
       {courierPos && status !== 'delivered' && (
         // CSS moves the courier smoothly between the twice-a-second updates.
         <g className="map__courier" style={{ transform: `translate(${courierPos.x + nudge}px, ${courierPos.y - nudge}px)` }} role="img" aria-label="Your courier">
           <circle className="map__pulse" r="34" />
           <circle r="26" />
-          <text textAnchor="middle" dominantBaseline="central" fontSize="28">
-            {vehicle}
-          </text>
+          <MapIcon name="bike" size={30} />
         </g>
       )}
     </svg>
