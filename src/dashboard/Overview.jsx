@@ -8,7 +8,14 @@ import { Empty, Loading, StatTile, StatusPill, ago, count, hourLabel, money, mon
 // Uses today's summary from the server plus the live board, so it updates as orders move.
 export default function Overview({ restaurant, today, kitchen, base }) {
   const live = kitchen.orders;
-  const all = useMemo(() => (today && live ? [...live, ...today.history].sort((a, b) => b.placedAt - a.placedAt) : null), [today, live]);
+  // Today's orders only, by the restaurant's own calendar day (as the server counts them).
+  // The live board can still hold an order from an earlier day; it counts under "Right now" but not here.
+  const all = useMemo(() => {
+    if (!today || !live) return null;
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: restaurant.timezone || undefined });
+    const todayKey = day.format(Date.now());
+    return [...live.filter((o) => day.format(o.placedAt) === todayKey), ...today.history].sort((a, b) => b.placedAt - a.placedAt);
+  }, [today, live, restaurant.timezone]);
 
   const hours = useMemo(() => {
     if (!all) return [];

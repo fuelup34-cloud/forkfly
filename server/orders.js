@@ -64,6 +64,7 @@ function fromRow(row) {
     riderId: row.riderId ?? null,
     commission: row.commission ?? 0, // Forkfly's cut; never sent to customers
     gps: row.gps ?? undefined,
+    payment: row.payment ?? null,
   };
 }
 
@@ -119,7 +120,9 @@ export function shortName(name) {
   return parts.length > 1 ? `${parts[0]} ${[...parts[parts.length - 1]][0].toUpperCase()}.` : parts[0];
 }
 
-export async function createOrder(customer, body) {
+// Checks an order request against the menu and Forkfly's rules and works out the price.
+// Used for the payment quote and again when the order is created, so both agree.
+export async function quoteOrder(body) {
   const rules = settings();
   if (!rules.orderingOpen) throw new HttpError(503, 'Forkfly is paused right now. Please try again a little later.');
   const restaurant = await loadRestaurant(typeof body?.restaurantId === 'string' ? body.restaurantId : '');
@@ -146,6 +149,17 @@ export async function createOrder(customer, body) {
   const km = distanceKm(restaurant, address);
   if (km / KM_PER_MILE > rules.maxRadiusMiles) throw new HttpError(400, `${restaurant.name} is too far away to deliver to that address.`);
   const pricing = priceBreakdown({ subtotal, km, tip: safeTip });
+  return { restaurant, address, items, subtotal, km, pricing };
+}
+
+// `options.id` and `options.payment` come from a paid checkout (see payments.js).
+export const newOrderId = () => randomUUID().slice(0, 8).toUpperCase();
+
+export async function createOrder(customer, body, options = {}) {
+  const { restaurant, address, items, subtotal, km, pricing } = await quoteOrder(body);
+  if (options.payment && options.payment.amount !== pricing.total) {
+    throw new HttpError(409, 'Prices changed while you were paying. You haven’t been charged for this order.');
+  }
 
   // Restaurants with their own staff run their kitchen from the dashboard. The demo ones run themselves.
   const [staffed] = await db.select({ id: restaurantMember.userId }).from(restaurantMember).where(eq(restaurantMember.restaurantId, restaurant.id)).limit(1);
@@ -175,7 +189,7 @@ export async function createOrder(customer, body) {
   }
 
   const order = {
-    id: randomUUID().slice(0, 8).toUpperCase(),
+    id: options.id ?? newOrderId(),
     customerId: customer.id,
     customerLabel: shortName(customer.name),
     restaurantId: restaurant.id,
@@ -196,6 +210,7 @@ export async function createOrder(customer, body) {
     rejectReason: null,
     riderId: null,
     commission: Math.round(subtotal * restaurant.commission),
+    payment: options.payment ?? null,
   };
   await db.insert(orderTable).values({
     id: order.id,
@@ -215,6 +230,7 @@ export async function createOrder(customer, body) {
     pickupPath,
     dropPath,
     timeline,
+    payment: order.payment,
   });
   cache.set(order.id, order);
   orderEvents.emit('changed', order);
@@ -242,7 +258,9 @@ export async function declineUnanswered(now = Date.now()) {
     order.rejectedAt = now;
     order.rejectReason = 'no_response';
     if (order.gps) order.gps.trail = [];
-    await persist(order, ['rejectedAt', 'rejectReason', 'gps']).catch((err) => console.error('Could not decline order', order.id, err.message));
+    await persist(order, ['rejectedAt', 'rejectReason', 'gps'])
+      .then(() => orderEvents.emit('stopped', order))
+      .catch((err) => console.error('Could not decline order', order.id, err.message));
   }
 }
 
@@ -287,6 +305,7 @@ export async function rejectOrder(order, body) {
   order.rejectReason = reason;
   if (order.gps) order.gps.trail = [];
   await persist(order, ['rejectedAt', 'rejectReason', 'gps']);
+  orderEvents.emit('stopped', order);
 }
 
 export async function markReady(order) {
@@ -313,6 +332,19 @@ export async function adminCancel(order) {
   order.cancelledAt = Date.now();
   if (order.gps) order.gps.trail = [];
   await persist(order, ['cancelledAt', 'gps']);
+  orderEvents.emit('stopped', order);
+}
+
+// The customer cancels before the kitchen starts (or the courier picks up a self-run order).
+export async function customerCancel(order) {
+  if (!orderSnapshot(order).canCancel) {
+    const msg = order.timeline.manual ? 'The restaurant has started cooking, so it can’t be cancelled now.' : 'Your courier already has the food, so it can’t be cancelled now.';
+    throw new HttpError(409, msg);
+  }
+  order.cancelledAt = Date.now();
+  if (order.gps) order.gps.trail = [];
+  await persist(order, ['cancelledAt', 'gps']);
+  orderEvents.emit('stopped', order);
 }
 
 // ---------- What the kitchen sees ----------

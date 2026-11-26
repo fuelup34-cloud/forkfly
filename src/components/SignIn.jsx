@@ -6,6 +6,7 @@ import { Link, navigate } from "../router.jsx";
 import Icon from "./Icon.jsx";
 import Logo from "./Logo.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
+import { ForgotPasswordCard, PasswordField, VerifyEmailStep, authError } from "./AuthSteps.jsx";
 import {
   ACCOUNT_TYPES,
   AccountTypePicker,
@@ -15,14 +16,11 @@ import {
 } from "./JoinFields.jsx";
 import "./auth.css";
 
-const authError = (err) =>
-  err.status === 429
-    ? "Too many attempts. Please wait a minute and try again."
-    : err.message || "That didn’t work. Please try again.";
-
-// One page for both signing in and creating an account (as a customer, restaurant or rider).
+// One page for signing in, creating an account (as a customer, restaurant or rider),
+// confirming the email with a code, and resetting a forgotten password.
 export default function SignIn({ mode, onSignedIn }) {
   const creating = mode === "signup";
+  const forgot = mode === "forgot";
   const params = new URLSearchParams(location.search);
   const next = safeNext(params.get("next"));
   const [type, setType] = useState(() =>
@@ -33,13 +31,31 @@ export default function SignIn({ mode, onSignedIn }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [join, setJoin] = useState(EMPTY_JOIN);
   // Set once the account exists, so a retry after a failed application doesn't sign up twice.
   const [accountMade, setAccountMade] = useState(false);
+  // "form" or "verify" (the 6-digit code sent to their email).
+  const [step, setStep] = useState("form");
+  const [verified, setVerified] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const query = next === "/" ? "" : `?next=${encodeURIComponent(next)}`;
+
+  // Signed in and confirmed: send in any application, then go where they were heading.
+  async function finish() {
+    const applied = creating ? await submitApplication(api, type, join) : null;
+    const me = await onSignedIn();
+    // A page they were sent here from wins. Otherwise admins and restaurant teams go to their dashboard.
+    const home = next !== "/" ? next : (homeFor(me) ?? "/");
+    const dest = !creating
+      ? home
+      : type === "customer"
+        ? next
+        : type === "restaurant"
+          ? `/dashboard/${applied.id}`
+          : "/account";
+    navigate(dest, { replace: true });
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -51,6 +67,12 @@ export default function SignIn({ mode, onSignedIn }) {
           email: email.trim(),
           password,
         });
+        // Not confirmed yet: the server has just emailed a fresh code.
+        if (err?.code === "EMAIL_NOT_VERIFIED") {
+          setStep("verify");
+          setBusy(false);
+          return;
+        }
         if (err) throw new Error(authError(err));
       } else if (!accountMade) {
         const { error: err } = await authClient.signUp.email({
@@ -61,21 +83,26 @@ export default function SignIn({ mode, onSignedIn }) {
         if (err) throw new Error(authError(err));
         setAccountMade(true);
       }
-      const applied = creating
-        ? await submitApplication(api, type, join)
-        : null;
-      const me = await onSignedIn();
-      // A page they were sent here from wins. Otherwise admins and restaurant teams go to their dashboard.
-      const home = next !== "/" ? next : (homeFor(me) ?? "/");
-      const dest = !creating
-        ? home
-        : type === "customer"
-          ? next
-          : type === "restaurant"
-            ? `/dashboard/${applied.id}`
-            : "/account";
-      navigate(dest, { replace: true });
+      if (creating && !verified) {
+        setStep("verify");
+        setBusy(false);
+        return;
+      }
+      await finish();
     } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+
+  // The code was right, and they're signed in now.
+  async function onVerified() {
+    setVerified(true);
+    try {
+      await finish();
+    } catch (err) {
+      // e.g. the restaurant application failed: show it on the form, where they can fix and retry.
+      setStep("form");
       setError(err.message);
       setBusy(false);
     }
@@ -92,6 +119,30 @@ export default function SignIn({ mode, onSignedIn }) {
         </header>
 
         <div className="auth-card">
+          {forgot ? (
+            <ForgotPasswordCard
+              initialEmail={params.get("email") ?? ""}
+              signInHref={`/signin${query}`}
+              onDone={async ({ signedIn }) => {
+                if (!signedIn) return navigate(`/signin${query}`, { replace: true });
+                const me = await onSignedIn();
+                navigate(next !== "/" ? next : (homeFor(me) ?? "/"), { replace: true });
+              }}
+            />
+          ) : step === "verify" ? (
+            <VerifyEmailStep
+              email={email.trim()}
+              onVerified={onVerified}
+              backLabel={creating ? "Use a different email" : "Back to sign in"}
+              onBack={() => {
+                setStep("form");
+                setError("");
+                // The unconfirmed account stays behind; a new email makes a new account.
+                if (creating) setAccountMade(false);
+              }}
+            />
+          ) : (
+          <>
           <h1 className="auth-card__title">
             {creating ? "Create your account" : "Welcome back"}
           </h1>
@@ -130,32 +181,27 @@ export default function SignIn({ mode, onSignedIn }) {
                 placeholder="you@example.com"
               />
             </label>
-            <div className="field">
-              <label htmlFor="auth-password">Password</label>
-              <span className="auth-password">
-                <input
-                  required
-                  id="auth-password"
-                  type={showPassword ? "text" : "password"}
-                  minLength={creating ? 8 : undefined}
-                  maxLength={128}
-                  autoComplete={creating ? "new-password" : "current-password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={accountMade}
-                  placeholder={creating ? "At least 8 characters" : ""}
-                />
-                <button
-                  type="button"
-                  className="auth-password__toggle"
-                  onClick={() => setShowPassword((s) => !s)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  aria-pressed={showPassword}
-                >
-                  <Icon name={showPassword ? "eye-off" : "eye"} size={18} />
-                </button>
-              </span>
-            </div>
+            <PasswordField
+              id="auth-password"
+              label={
+                <span className="auth-label-row">
+                  <label htmlFor="auth-password">Password</label>
+                  {!creating && (
+                    <Link
+                      to={`/forgot-password?${new URLSearchParams({ ...(email.trim() ? { email: email.trim() } : {}), ...(next !== "/" ? { next } : {}) })}`}
+                      className="auth-forgot"
+                    >
+                      Forgot password?
+                    </Link>
+                  )}
+                </span>
+              }
+              value={password}
+              onChange={setPassword}
+              autoComplete={creating ? "new-password" : "current-password"}
+              placeholder={creating ? "At least 8 characters" : ""}
+              disabled={accountMade}
+            />
             {creating && (
               <JoinFields type={type} values={join} onChange={setJoin} />
             )}
@@ -192,6 +238,8 @@ export default function SignIn({ mode, onSignedIn }) {
               {creating ? "Sign in" : "Create an account"}
             </Link>
           </p>
+          </>
+          )}
         </div>
 
         <footer className="auth-foot">

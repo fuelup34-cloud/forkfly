@@ -6,6 +6,7 @@ import Monogram from './Monogram.jsx';
 import { Link, navigate } from '../router.jsx';
 import FeeLines from './FeeLines.jsx';
 import QtyStepper from './QtyStepper.jsx';
+import PaymentStep from './PaymentStep.jsx';
 
 export default function Checkout({ cart, addressId, setAddressId, me }) {
   const [restaurant, setRestaurant] = useState(null);
@@ -13,7 +14,19 @@ export default function Checkout({ cart, addressId, setAddressId, me }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // A started card payment: { checkoutId, clientSecret, amount, key }. Null until "Continue to payment".
+  const [payment, setPayment] = useState(null);
   const { restaurant: cartRestaurant, lines } = cart.cart;
+  const payments = me?.config?.payments ?? null; // null: demo checkout, no payment taken
+
+  // What's being paid for. If any of it changes after payment starts, the payment starts over.
+  const request = cartRestaurant
+    ? { restaurantId: cartRestaurant.id, addressId, items: lines.map((l) => ({ id: l.id, qty: l.qty })), tip, note: note.trim() }
+    : null;
+  const requestKey = JSON.stringify(request);
+  useEffect(() => {
+    if (payment && payment.key !== requestKey) setPayment(null);
+  }, [requestKey, payment]);
 
   // We need the restaurant's location to work out the delivery fee.
   useEffect(() => {
@@ -48,19 +61,23 @@ export default function Checkout({ cart, addressId, setAddressId, me }) {
           ? `${restaurant.name} is too far away to deliver to this address.`
           : '';
 
+  const placed = (order) => {
+    cart.clear();
+    navigate(`/orders/${order.id}`, { replace: true });
+  };
+
   async function placeOrder() {
     setBusy(true);
     setError('');
     try {
-      const order = await api.placeOrder({
-        restaurantId: cartRestaurant.id,
-        addressId,
-        items: lines.map((l) => ({ id: l.id, qty: l.qty })),
-        tip,
-        note,
-      });
-      cart.clear();
-      navigate(`/orders/${order.id}`, { replace: true });
+      if (payments) {
+        // The server checks the order and prices it, then starts a payment for exactly that.
+        const started = await api.startCheckout(request);
+        setPayment({ ...started, key: requestKey });
+        setBusy(false);
+      } else {
+        placed(await api.placeOrder(request));
+      }
     } catch (err) {
       setError(err.message);
       setBusy(false);
@@ -144,12 +161,20 @@ export default function Checkout({ cart, addressId, setAddressId, me }) {
             <Link to={signInLink('/checkout')} className="btn btn--block btn--big">
               Sign in to place your order
             </Link>
+          ) : payment && !blocked ? (
+            <PaymentStep publishableKey={payments.publishableKey} checkout={payment} onPaid={placed} onBack={() => setPayment(null)} />
           ) : (
             <button type="button" className="btn btn--block btn--big" onClick={placeOrder} disabled={busy || !restaurant || !me || !!blocked}>
-              {busy ? 'Placing order…' : `Place order · ${formatMoney(pricing.total)}`}
+              {busy
+                ? payments
+                  ? 'One moment…'
+                  : 'Placing order…'
+                : payments
+                  ? `Continue to payment · ${formatMoney(pricing.total)}`
+                  : `Place order · ${formatMoney(pricing.total)}`}
             </button>
           )}
-          <p className="muted small center">Demo checkout: no payment is taken.</p>
+          {!payments && <p className="muted small center">Demo checkout: no payment is taken.</p>}
         </aside>
       </div>
     </div>

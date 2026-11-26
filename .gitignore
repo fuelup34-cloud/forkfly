@@ -1,7 +1,33 @@
+# Dependencies and build output
 node_modules
 dist
-server/data.json
-.DS_Store
-.certs
+
+# Secrets and local settings: never commit these. .env.example is the template.
 .env
+.env.*
+!.env.example
+.certs
+*.pem
+*.key
+
+# Local data
+server/data.json
 server/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+logs
+
+# Editors and OS files
+.DS_Store
+Thumbs.db
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Tool caches
+.vite
+coverage
+.eslintcache

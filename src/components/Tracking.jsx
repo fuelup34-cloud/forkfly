@@ -79,7 +79,8 @@ export default function Tracking({ id, me }) {
   }
 
   async function cancel() {
-    const ok = await ask({ title: 'Cancel this order?', body: 'You won’t be charged.', confirm: 'Cancel order', cancel: 'Keep order', danger: true });
+    const paid = order.payment?.status === 'paid';
+    const ok = await ask({ title: 'Cancel this order?', body: paid ? `You’ll get a full refund of ${formatMoney(order.payment.amount)} to your card.` : 'You won’t be charged.', confirm: 'Cancel order', cancel: 'Keep order', danger: true });
     if (!ok) return;
     setCancelError('');
     try {
@@ -120,7 +121,7 @@ export default function Tracking({ id, me }) {
           <h1>{headline(order)}</h1>
           {order.status === 'rejected' && (
             <p className="muted">
-              {order.rejectReason}. You haven’t been charged.{' '}
+              {order.rejectReason}. {order.payment ? 'Your payment is refunded in full.' : 'You haven’t been charged.'}{' '}
               <Link to="/" className="text-link">
                 Find another restaurant
               </Link>
@@ -200,6 +201,7 @@ export default function Tracking({ id, me }) {
             ))}
           </ul>
           <FeeLines pricing={order.pricing} km={order.km} />
+          {order.payment && <PaymentLine payment={order.payment} />}
           {order.canCancel && (
             <button type="button" className="btn btn--ghost btn--block" onClick={cancel}>
               Cancel order
@@ -213,5 +215,30 @@ export default function Tracking({ id, me }) {
         </section>
       </div>
     </div>
+  );
+}
+
+const BRANDS = { visa: 'Visa', mastercard: 'Mastercard', amex: 'American Express', discover: 'Discover', diners: 'Diners Club', jcb: 'JCB', unionpay: 'UnionPay' };
+
+// How the order was paid, and whether the money has gone back.
+function PaymentLine({ payment: p }) {
+  const card = p.last4 ? `${BRANDS[p.brand] ?? 'Card'} •••• ${p.last4}` : 'card';
+  const refunded = p.status === 'refunded';
+  return (
+    <p className={`pay-line ${refunded ? 'is-refunded' : ''}`}>
+      <Icon name={refunded ? 'receipt' : 'check'} size={16} />
+      <span>
+        {refunded ? (
+          <>
+            <strong>Refunded {formatMoney(p.amount)}</strong> to {card}
+            <span className="muted small"> · It can take 5–10 business days to show on your statement.</span>
+          </>
+        ) : (
+          <>
+            <strong>Paid {formatMoney(p.amount)}</strong> with {card}
+          </>
+        )}
+      </span>
+    </p>
   );
 }

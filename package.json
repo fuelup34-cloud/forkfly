@@ -17,10 +17,12 @@
     "seed:dev": "node --env-file=.env scripts/seed-dev.js"
   },
   "dependencies": {
+    "@stripe/stripe-js": "^10.4.0",
     "better-auth": "1.7.20",
     "drizzle-orm": "0.45.4",
     "leaflet": "^1.9.4",
     "pg": "8.23.1",
+    "stripe": "^23.2.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {

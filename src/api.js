@@ -1,7 +1,9 @@
 import { createAuthClient } from 'better-auth/client';
+import { emailOTPClient } from 'better-auth/client/plugins';
 
-// Sign-up, sign-in and sign-out. The session is a cookie, so every request below carries it.
-export const authClient = createAuthClient({ baseURL: location.origin, basePath: '/api/auth' });
+// Sign-up, sign-in and sign-out, plus emailed 6-digit codes (confirming an email, resetting a password).
+// The session is a cookie, so every request below carries it.
+export const authClient = createAuthClient({ baseURL: location.origin, basePath: '/api/auth', plugins: [emailOTPClient()] });
 
 export async function request(path, { method = 'GET', body } = {}) {
   const res = await fetch(`/api${path}`, {
@@ -32,6 +34,9 @@ export const api = {
   restaurants: (addressId) => cached(`list:${addressId}`, () => request(`/restaurants?address=${addressId}`)),
   restaurant: (id, addressId) => cached(`r:${id}:${addressId}`, () => request(`/restaurants/${encodeURIComponent(id)}?address=${addressId}`)),
   placeOrder: (body) => request('/orders', { method: 'POST', body }),
+  // Paid checkout: start a card payment for the order, then turn the paid payment into the order.
+  startCheckout: (body) => request('/checkout', { method: 'POST', body }),
+  completeCheckout: (checkoutId) => request('/checkout/complete', { method: 'POST', body: { checkoutId } }),
   orders: () => request('/orders'),
   order: (id) => request(`/orders/${encodeURIComponent(id)}`),
   useGps: (id) => request(`/orders/${encodeURIComponent(id)}/gps`, { method: 'POST' }),

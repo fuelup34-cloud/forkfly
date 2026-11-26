@@ -22,11 +22,12 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import { toNodeHandler } from 'better-auth/node';
 import { db, schema } from './db/index.js';
 import { auth, getSession, TRUSTED_ORIGINS } from './auth.js';
-import { HttpError, cleanText, json, readBody } from './http.js';
+import { HttpError, cleanText, json, readBody, readRaw } from './http.js';
 import { loadRestaurant, loadRestaurants, summary } from './catalog.js';
 import {
   cache,
   createOrder,
+  customerCancel,
   declineUnanswered,
   fromRowCached,
   getOrder,
@@ -42,6 +43,7 @@ import { handleDashboard, membership } from './dashboard.js';
 import { handleAdmin } from './admin.js';
 import { loadSettings, publicConfig, settings } from './settings.js';
 import { handleUpload, serveUpload } from './uploads.js';
+import { completeCheckout, handleStripeWebhook, paymentConfig, paymentsEnabled, startCheckout } from './payments.js';
 import { ADDRESSES, CITY_SIZE, GRID, VEHICLES, kitchenStatus, orderSnapshot } from '../shared/core.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -65,12 +67,19 @@ const { restaurant: restaurantTable, restaurantMember, rider: riderTable, order:
 function view(order) {
   const { customerId, customerLabel, commission, riderId, ...rest } = orderSnapshot(order);
   if (order.rejectReason) rest.rejectReason = REJECT_REASONS[order.rejectReason];
+  if (order.payment) {
+    const { intentId, ...payment } = order.payment;
+    rest.payment = payment;
+  }
   if (order.gps && tls) {
     const lan = Object.values(os.networkInterfaces()).flat().find((n) => n.family === 'IPv4' && !n.internal);
     if (lan) rest.phoneBase = `https://${lan.address}:${HTTPS_PORT}`;
   }
   return rest;
 }
+
+// Rules and fees, plus what the browser needs to take payment (null = demo checkout, no payment).
+const clientConfig = () => ({ ...publicConfig(), payments: paymentConfig() });
 
 // ---------- Accounts ----------
 
@@ -86,7 +95,7 @@ async function me(user) {
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
     restaurants,
     rider: rider ?? null,
-    config: publicConfig(),
+    config: clientConfig(),
   };
 }
 
@@ -208,6 +217,11 @@ async function requireUser(req) {
 async function handleApi(req, res, url) {
   const parts = url.pathname.split('/').filter(Boolean).slice(1); // drop "api"
   const address = addressById.get(url.searchParams.get('address')) ?? ADDRESSES[0];
+  // Stripe's server calls this (signed with the webhook secret), so it skips the same-page check.
+  if (req.method === 'POST' && parts[0] === 'stripe' && parts[1] === 'webhook' && parts.length === 2) {
+    const raw = await readRaw(req, 512 * 1024);
+    return json(res, 200, await handleStripeWebhook(raw, req.headers['stripe-signature']));
+  }
   if (req.method !== 'GET' && !fromTrustedPage(req)) return json(res, 403, { error: 'Requests must come from the Forkfly app.' });
 
   if (req.method === 'GET' && parts[0] === 'restaurants' && parts.length === 1) {
@@ -223,7 +237,7 @@ async function handleApi(req, res, url) {
 
   if (req.method === 'GET' && parts[0] === 'me' && parts.length === 1) {
     const session = await getSession(req);
-    return json(res, 200, session ? await me(session.user) : { user: null, restaurants: [], rider: null, config: publicConfig() });
+    return json(res, 200, session ? await me(session.user) : { user: null, restaurants: [], rider: null, config: clientConfig() });
   }
 
   if (req.method === 'POST' && parts[0] === 'apply' && parts.length === 2) {
@@ -240,6 +254,12 @@ async function handleApi(req, res, url) {
 
   if (parts[0] === 'courier' && parts[1]) return handleCourier(req, res, parts[1], parts[2]);
 
+  if (parts[0] === 'checkout' && req.method === 'POST') {
+    const user = await requireUser(req);
+    if (parts.length === 1) return json(res, 201, await startCheckout(user, await readBody(req)));
+    if (parts[1] === 'complete' && parts.length === 2) return json(res, 200, view(await completeCheckout((await readBody(req)).checkoutId, user.id)));
+  }
+
   if (parts[0] === 'orders') {
     const user = await requireUser(req);
 
@@ -248,6 +268,8 @@ async function handleApi(req, res, url) {
       return json(res, 200, rows.map((row) => view(fromRowCached(row))));
     }
     if (req.method === 'POST' && parts.length === 1) {
+      // With payments on, orders are only created by a paid checkout.
+      if (paymentsEnabled) return json(res, 402, { error: 'Please pay to place your order.' });
       return json(res, 201, view(await createOrder(user, await readBody(req))));
     }
 
@@ -265,13 +287,7 @@ async function handleApi(req, res, url) {
       return json(res, 200, view(order));
     }
     if (req.method === 'POST' && parts[2] === 'cancel') {
-      if (!orderSnapshot(order).canCancel) {
-        const msg = order.timeline.manual ? 'The restaurant has started cooking, so it can’t be cancelled now.' : 'Your courier already has the food, so it can’t be cancelled now.';
-        return json(res, 409, { error: msg });
-      }
-      order.cancelledAt = Date.now();
-      if (order.gps) order.gps.trail = [];
-      await persist(order, ['cancelledAt', 'gps']);
+      await customerCancel(order);
       return json(res, 200, view(order));
     }
   }

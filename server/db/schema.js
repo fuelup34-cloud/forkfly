@@ -219,12 +219,36 @@ export const order = pgTable(
     timeline: jsonb().$type().notNull(),
     // Set when a real courier shares GPS from their phone. Holds the link key and recent trail.
     gps: jsonb().$type(),
+    // How it was paid: { provider: 'stripe', intentId, amount, status: 'paid' | 'refunded', brand, last4, refundedAt }.
+    // Null for orders placed before payments (or with payments turned off).
+    payment: jsonb().$type(),
   },
   (t) => [
     index('order_customer_idx').on(t.customerId, t.placedAt),
     index('order_restaurant_idx').on(t.restaurantId, t.placedAt),
     index('order_rider_idx').on(t.riderId),
   ]
+);
+
+// ---------- Payments ----------
+
+// One row per Stripe PaymentIntent started at checkout. The order itself is only created once
+// the payment succeeds; `orderId` is claimed first, so the browser and the webhook can't both create it.
+export const checkout = pgTable(
+  'checkout',
+  {
+    id: text().primaryKey(), // the PaymentIntent id
+    customerId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    request: jsonb().$type().notNull(), // what the customer asked for (restaurant, items, address, tip, note)
+    amount: integer().notNull(), // cents, as quoted
+    orderId: text(),
+    status: text().notNull().default('open'), // open | done | failed
+    error: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('checkout_customer_idx').on(t.customerId, t.createdAt)]
 );
 
 // ---------- Platform settings ----------

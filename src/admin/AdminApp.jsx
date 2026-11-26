@@ -112,7 +112,7 @@ export default function AdminApp({ me, path }) {
         </nav>
         <div className="dash-side__foot">
           <Link to="/account" className="dash-side__user">
-            <Icon name="user" size={16} /> {me.user.name}
+            <Icon name="user" size={16} /> <span className="dash-side__name">{me.user.name}</span>
           </Link>
           <ThemeToggle />
         </div>

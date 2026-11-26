@@ -881,8 +881,11 @@
   }
 }
 @media (max-width: 860px) {
+  /* One column: a compact top bar, then the page. The second row takes the spare height,
+     so a short page doesn't stretch the top bar. */
   .dash {
     grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
   }
   .dash-side {
     position: sticky;
@@ -891,22 +894,25 @@
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
+    align-content: start;
+    gap: 8px 12px;
+    padding: 10px 16px 8px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
-  .dash-brand__tag,
-  .dash-side__foot {
-    display: none;
-  }
+  /* Row 1: brand, restaurant (if any), account + theme. Row 2: the nav. */
   .dash-place {
     padding: 0;
     background: none;
     flex: 1;
     min-width: 0;
   }
+  .dash-side__foot {
+    margin: 0 0 0 auto;
+    padding: 0;
+  }
   .dash-nav {
+    order: 1;
     flex-direction: row;
     width: 100%;
     overflow-x: auto;
@@ -927,6 +933,10 @@
   }
 }
 @media (max-width: 600px) {
+  .dash-side__name,
+  .dash-brand__tag {
+    display: none;
+  }
   .stat-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;

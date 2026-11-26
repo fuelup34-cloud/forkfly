@@ -96,6 +96,8 @@ function facts(order, now) {
     status,
     deliveryMin,
     rejectReason: order.rejectReason ? REJECT_REASONS[order.rejectReason] : '',
+    // How it was paid (null for demo orders). The Stripe id lets an admin find it in the Stripe dashboard.
+    payment: order.payment ? { status: order.payment.status, brand: order.payment.brand, last4: order.payment.last4, intentId: order.payment.intentId } : null,
   };
 }
 

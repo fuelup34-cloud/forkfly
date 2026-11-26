@@ -6,8 +6,10 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError } from 'better-auth/api';
 import { fromNodeHeaders } from 'better-auth/node';
+import { emailOTP } from 'better-auth/plugins';
 import { eq } from 'drizzle-orm';
 import { db, schema } from './db/index.js';
+import { sendCodeEmail } from './mail.js';
 
 const HTTP_PORT = Number(process.env.PORT) || 3002;
 const PUBLIC_PORT = Number(process.env.PUBLIC_PORT) || 5190;
@@ -51,7 +53,27 @@ export const auth = betterAuth({
     minPasswordLength: 8,
     maxPasswordLength: 128,
     autoSignIn: true,
+    // New accounts confirm their email with a 6-digit code before they can sign in.
+    requireEmailVerification: true,
+    revokeSessionsOnPasswordReset: true,
   },
+  emailVerification: {
+    sendOnSignUp: true,
+    // Signing in to an unconfirmed account sends a fresh code.
+    sendOnSignIn: true,
+    autoSignInAfterVerification: true,
+  },
+  plugins: [
+    emailOTP({
+      otpLength: 6,
+      expiresIn: 10 * 60,
+      allowedAttempts: 5,
+      storeOTP: 'hashed',
+      // Codes replace Better Auth's default verification links.
+      overrideDefaultEmailVerification: true,
+      sendVerificationOTP: sendCodeEmail,
+    }),
+  ],
   user: {
     additionalFields: {
       // input: false — nobody can make themselves an admin by sending a role when signing up.
@@ -82,6 +104,11 @@ export const auth = betterAuth({
     customRules: {
       '/sign-in/email': { window: 60, max: 10 },
       '/sign-up/email': { window: 60, max: 5 },
+      // Each sends an email, and codes are short, so these stay tight.
+      '/email-otp/send-verification-otp': { window: 60, max: 3 },
+      '/email-otp/request-password-reset': { window: 60, max: 3 },
+      '/email-otp/verify-email': { window: 60, max: 10 },
+      '/email-otp/reset-password': { window: 60, max: 10 },
     },
   },
   telemetry: { enabled: false },

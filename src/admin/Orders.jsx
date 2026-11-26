@@ -177,6 +177,16 @@ function OrderDrawer({ order: o, onClose, onChange }) {
         </Fact>
         {o.deliveryMin && <Fact label="Delivered in">{o.deliveryMin} min</Fact>}
         <Fact label="Items">{o.items}</Fact>
+        <Fact label="Paid by">
+          {!o.payment ? (
+            <span className="muted">No payment (demo order)</span>
+          ) : (
+            <>
+              {o.payment.last4 ? `${o.payment.brand ?? 'Card'} •••• ${o.payment.last4}` : 'Card'} · {o.payment.status === 'refunded' ? 'Refunded' : 'Paid'}
+              <span className="muted small table__sub mono-text">{o.payment.intentId}</span>
+            </>
+          )}
+        </Fact>
       </dl>
       <h3 className="drawer__section">Payment</h3>
       <dl className="money-lines">

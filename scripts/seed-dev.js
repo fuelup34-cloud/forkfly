@@ -61,6 +61,8 @@ async function ensureUser({ email, name }) {
     await db.update(account).set({ password: hash }).where(and(eq(account.userId, u.id), eq(account.providerId, 'credential')));
     await db.update(user).set({ name }).where(eq(user.id, u.id));
   }
+  // Test accounts skip the emailed code, so they can sign in straight away.
+  if (!u.emailVerified) await db.update(user).set({ emailVerified: true }).where(eq(user.id, u.id));
   return u;
 }
 

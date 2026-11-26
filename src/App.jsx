@@ -82,6 +82,7 @@ export default function App() {
 
   // Sign-in gets the whole screen, without the store's navigation.
   if (path === '/signin' || path === '/signup') return <SignIn key={path} mode={path.slice(1)} onSignedIn={refreshMe} />;
+  if (path === '/forgot-password') return <SignIn key={path} mode="forgot" onSignedIn={refreshMe} />;
 
   // Pick the page (and the title in the sticky bar) from the address.
   let page;

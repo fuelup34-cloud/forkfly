@@ -1109,6 +1109,75 @@ textarea {
   position: sticky;
   top: 76px;
 }
+/* Card payment, inside the checkout summary. */
+.pay-step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.pay-step__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pay-step__head h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 17px;
+}
+.pay-step__head h3 svg {
+  color: var(--accent-link);
+}
+.pay-step__test {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.pay-step__element {
+  min-height: 180px;
+}
+.pay-step__element.is-loading {
+  min-height: 0;
+}
+.pay-step__fine {
+  display: block;
+  margin: 0;
+  line-height: 1.45;
+}
+.pay-step__fine svg {
+  vertical-align: -2px;
+}
+.pay-line {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.pay-line svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent-link);
+}
+.pay-line.is-refunded {
+  background: var(--bg-alt);
+}
+.pay-line.is-refunded svg {
+  color: var(--text-2);
+}
 .addresses {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

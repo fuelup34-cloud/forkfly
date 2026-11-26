@@ -46,7 +46,22 @@ When signing up, people choose what they're here for:
 - **Run a restaurant**: also creates the restaurant as *pending*. It's hidden until approved and has a menu.
 - **Deliver**: also creates a *pending* rider.
 
+New accounts confirm their email with a 6-digit code before they can sign in, and **Forgot password?**
+on the sign-in page resets it with a code. Email isn't connected yet (Resend comes later), so the
+codes are printed in the server's log, as lines starting with `[mail]`. The test accounts are already confirmed.
+
 A signed-in customer can apply later from **Account → Work with Forkfly**.
+
+## Payments
+
+Checkout takes card payments through Stripe when `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY` are
+set in `.env` (see `.env.example`). Without them, checkout is a demo that takes no payment.
+
+- The order is only created once Stripe confirms the payment, so unpaid orders never reach a kitchen.
+- If the restaurant declines it, doesn't answer in time, or the order is cancelled, it's refunded in full automatically.
+- In test mode, pay with card `4242 4242 4242 4242`, any future date and any CVC.
+- Optional: set `STRIPE_WEBHOOK_SECRET` (from `stripe listen --forward-to localhost:5190/api/stripe/webhook`)
+  so an order is still created if the customer closes the tab right after paying.
 Admins approve applications on the admin dashboard (below). The same jobs also work from the terminal:
 
 ```bash
