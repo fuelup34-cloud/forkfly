@@ -15,6 +15,13 @@
       "when": 1795554698849,
       "tag": "0001_dashboard",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795635125269,
+      "tag": "0002_admin",
+      "breakpoints": true
     }
   ]
 }

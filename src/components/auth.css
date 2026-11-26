@@ -1,0 +1,461 @@
+/* ---------- Sign in and create account ---------- */
+/* A split screen: the form on the left, food photos and line drawings on the right. */
+
+.auth-screen {
+  --auth-brand: #064e3b;
+  --auth-brand-2: #047857;
+  --auth-ink: #ecfdf5;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Form side */
+.auth-screen__form {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 28px clamp(20px, 5vw, 64px);
+}
+.auth-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.auth-top a {
+  color: var(--text);
+  text-decoration: none;
+}
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  margin: auto;
+  padding: 48px 0;
+}
+.auth-card__title {
+  font-family: var(--font-display);
+  font-size: clamp(30px, 3.2vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin: 0 0 10px;
+}
+.auth-card__lead {
+  margin: 0 0 32px;
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.auth-form .field {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+.auth-form .field input,
+.auth-form .field select {
+  height: 50px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.auth-form .field input::placeholder {
+  color: var(--text-3);
+}
+.auth-form .field input:hover:not(:disabled),
+.auth-form .field select:hover {
+  border-color: var(--text-3);
+}
+.auth-form .field input:focus,
+.auth-form .field select:focus {
+  outline: none;
+  border-color: var(--accent-link);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-bright) 22%, transparent);
+}
+.auth-password {
+  position: relative;
+  display: block;
+}
+.auth-password input {
+  padding-right: 52px !important;
+}
+.auth-password__toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.auth-password__toggle:hover {
+  background: var(--bg-alt);
+  color: var(--text);
+}
+.auth-password__toggle:focus-visible {
+  outline: 2px solid var(--accent-bright);
+}
+.auth-note {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.auth-note svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent-link);
+}
+.auth-submit {
+  height: 52px;
+  margin-top: 6px;
+  font-weight: 600;
+  box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--accent) 80%, transparent);
+}
+.auth-switch {
+  margin: 28px 0 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  color: var(--text-2);
+  font-size: 15px;
+}
+.auth-switch a {
+  color: var(--accent-link);
+  font-weight: 600;
+  text-decoration: none;
+}
+.auth-switch a:hover {
+  text-decoration: underline;
+}
+.auth-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+.auth-foot a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+.auth-foot a:hover {
+  color: var(--text);
+}
+
+/* The account-type cards, a little roomier here. */
+.auth-form .type-pick__grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.auth-form .type-pick__option {
+  padding: 14px 12px;
+  border-radius: 14px;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.auth-form .type-pick__option:hover {
+  border-color: var(--text-3);
+}
+.auth-form .type-pick__option.is-active {
+  background: var(--accent-soft);
+}
+.auth-form .type-pick__option .muted {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+/* Picture side */
+.auth-showcase {
+  position: sticky;
+  top: 12px;
+  margin: 12px 12px 12px 0;
+  height: calc(100vh - 24px);
+  height: calc(100dvh - 24px);
+  border-radius: 28px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--auth-brand-2) 70%, transparent) 0%, transparent 60%),
+    radial-gradient(90% 70% at 0% 100%, #0b3b2e 0%, transparent 70%),
+    var(--auth-brand);
+  color: var(--auth-ink);
+  isolation: isolate;
+}
+.auth-showcase__inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  padding: clamp(32px, 5vw, 72px);
+}
+.auth-showcase__title {
+  max-width: 15em;
+  margin: 0 0 22px;
+  font-family: var(--font-display);
+  font-size: clamp(26px, 2.6vw, 38px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+  color: #fff;
+}
+.auth-points {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+  color: color-mix(in srgb, var(--auth-ink) 88%, transparent);
+}
+.auth-points li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.auth-points__tick {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  color: #6ee7b7;
+}
+
+/* Line-drawn food, drifting quietly in the background. */
+.auth-doodles {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  color: #a7f3d0;
+  pointer-events: none;
+}
+.auth-doodle {
+  position: absolute;
+  opacity: 0.16;
+  animation: auth-float 9s ease-in-out infinite;
+}
+.auth-doodle--1 { top: 6%; left: 8%; rotate: -12deg; }
+.auth-doodle--2 { top: 9%; right: 12%; rotate: 10deg; animation-delay: -2s; }
+.auth-doodle--3 { top: 34%; right: 5%; rotate: -8deg; animation-delay: -4s; }
+.auth-doodle--4 { bottom: 9%; right: 16%; rotate: 14deg; animation-delay: -1s; }
+.auth-doodle--5 { bottom: 5%; left: 36%; rotate: -6deg; animation-delay: -3s; }
+.auth-doodle--6 { bottom: 22%; left: 4%; rotate: 18deg; animation-delay: -5s; }
+.auth-doodle--7 { top: 46%; left: 3%; rotate: -20deg; animation-delay: -6s; }
+.auth-doodle--8 { top: 4%; left: 46%; rotate: 6deg; animation-delay: -7s; }
+@keyframes auth-float {
+  50% {
+    translate: 0 -10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-doodle {
+    animation: none;
+  }
+}
+
+/* Three photos, overlapping like prints on a table, with two small cards on top. */
+.auth-collage {
+  position: relative;
+  width: min(100%, 460px);
+  aspect-ratio: 1.18;
+  margin-bottom: clamp(28px, 4vh, 48px);
+}
+.auth-collage__photo {
+  position: absolute;
+  object-fit: cover;
+  border-radius: 22px;
+  box-shadow: 0 24px 48px -16px rgba(0, 0, 0, 0.55);
+  background: #0b3b2e;
+}
+.auth-collage__photo--1 {
+  left: 0;
+  top: 6%;
+  width: 64%;
+  height: 78%;
+  rotate: -3deg;
+  z-index: 2;
+}
+.auth-collage__photo--2 {
+  right: 0;
+  top: 0;
+  width: 44%;
+  height: 46%;
+  rotate: 4deg;
+  z-index: 1;
+}
+.auth-collage__photo--3 {
+  right: 4%;
+  bottom: 0;
+  width: 42%;
+  height: 44%;
+  rotate: -2deg;
+  z-index: 3;
+  border: 4px solid var(--auth-brand);
+}
+.auth-live-card,
+.auth-rating-card {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1d1d1f;
+  border-radius: 16px;
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.45);
+}
+.auth-live-card {
+  left: -4%;
+  bottom: 2%;
+  min-width: 230px;
+  padding: 12px 16px 12px 12px;
+}
+.auth-live-card__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #e3f6ee;
+  color: #047857;
+}
+.auth-live-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  color: #6e6e73;
+}
+.auth-live-card__text strong {
+  font-size: 14px;
+  color: #1d1d1f;
+}
+.auth-live-card__bar {
+  display: block;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 4px;
+  background: #e5e5ea;
+  overflow: hidden;
+}
+.auth-live-card__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #10b981;
+}
+.auth-rating-card {
+  top: 40%;
+  right: -3%;
+  gap: 4px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.auth-rating-card svg {
+  color: #047857;
+}
+.auth-rating-card span {
+  font-weight: 400;
+  color: #6e6e73;
+}
+
+/* Tablets: a shorter picture side. Phones: just a band with the headline. */
+@media (max-width: 1080px) {
+  .auth-rating-card {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .auth-screen {
+    grid-template-columns: 1fr;
+  }
+  .auth-showcase {
+    order: -1;
+    position: relative;
+    height: auto;
+    margin: 0;
+    border-radius: 0 0 24px 24px;
+  }
+  .auth-showcase__inner {
+    padding: 28px 20px 26px;
+  }
+  .auth-collage,
+  .auth-points {
+    display: none;
+  }
+  .auth-showcase__title {
+    margin: 0;
+    font-size: 22px;
+  }
+  .auth-doodle svg {
+    width: 30px;
+    height: 30px;
+  }
+  .auth-screen__form {
+    min-height: 0;
+    padding: 20px 16px 28px;
+  }
+  .auth-top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    padding: 16px;
+  }
+  .auth-top a,
+  .auth-top button {
+    color: #fff;
+  }
+  .auth-showcase__inner {
+    padding-top: 72px;
+  }
+  .auth-card {
+    padding: 20px 0 32px;
+  }
+}
+@media (max-width: 520px) {
+  .auth-form .type-pick__grid {
+    grid-template-columns: 1fr;
+  }
+  .auth-form .type-pick__option {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 12px;
+  }
+  .auth-form .type-pick__option svg {
+    grid-row: span 2;
+    margin: 2px 0 0;
+  }
+}

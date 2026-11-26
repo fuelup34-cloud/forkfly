@@ -219,6 +219,11 @@ function Restaurant({ me, rid, tab }) {
             <strong>Thanks for joining Forkfly.</strong> We’re reviewing {restaurant.name}. Meanwhile, add your menu and photos so you’re ready to go live.
           </div>
         )}
+        {restaurant.status === 'suspended' && (
+          <div className="notice notice--warn dash-banner" role="alert">
+            <strong>{restaurant.name} is suspended, so customers can’t order.</strong> {restaurant.statusNote || 'Please contact Forkfly.'}
+          </div>
+        )}
 
         {tab === '' && <Overview restaurant={restaurant} today={today} kitchen={kitchen} base={base} />}
         {tab === '/orders' && <OrdersPage restaurant={restaurant} today={today} kitchen={kitchen} />}

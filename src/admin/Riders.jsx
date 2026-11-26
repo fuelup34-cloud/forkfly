@@ -18,7 +18,12 @@ export default function Riders({ onChange }) {
   const [q, setQ] = useState('');
   const [openId, setOpenId] = useState(null);
 
-  const load = () => adminApi.riders().then(setList);
+  const [error, setError] = useState('');
+  const load = () =>
+    adminApi
+      .riders()
+      .then(setList)
+      .catch((err) => setError(err.message));
   useEffect(() => {
     load();
   }, []);
@@ -44,9 +49,10 @@ export default function Riders({ onChange }) {
         <Tabs value={status} onChange={setStatus} tabs={tabs} />
         <SearchBox value={q} onChange={setQ} placeholder="Name, email or vehicle" />
       </div>
+      {error && <p className="notice notice--error">{error}</p>}
       <section className="dash-card">
         {!list ? (
-          <Loading />
+          !error && <Loading />
         ) : !shown.length ? (
           <Empty icon="bike" title={status === 'pending' ? 'No applications waiting' : 'No riders match'} />
         ) : (
@@ -94,7 +100,7 @@ export default function Riders({ onChange }) {
                       <Presence r={r} />
                     </td>
                     <td className="num">{r.status === 'pending' ? '—' : count(r.deliveries30)}</td>
-                    <td className="num">{r.status === 'pending' ? '—' : percent(r.onTime, 0)}</td>
+                    <td className="num">{r.onTime == null ? '—' : percent(r.onTime, 0)}</td>
                     <td className="num">{r.rating ? `★ ${r.rating.toFixed(1)}` : '—'}</td>
                     <td className="num">{r.status === 'pending' ? '—' : money(r.earnings30)}</td>
                   </tr>
@@ -128,12 +134,16 @@ function RiderDrawer({ r, onClose, onChange }) {
   const [dialog, ask] = useConfirm();
   const [reason, setReason] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   async function setStatus(status, note = '') {
     setBusy(true);
+    setError('');
     try {
       await adminApi.setRiderStatus(r.id, status, note);
       await onChange();
+    } catch (err) {
+      setError(err.message);
     } finally {
       setBusy(false);
     }
@@ -171,6 +181,7 @@ function RiderDrawer({ r, onClose, onChange }) {
 
   return (
     <Drawer title={r.name} onClose={onClose} footer={actions}>
+      {error && <p className="notice notice--error">{error}</p>}
       <div className="drawer__status">
         <StatusPill status={r.status} />
         <Presence r={r} />
@@ -185,7 +196,7 @@ function RiderDrawer({ r, onClose, onChange }) {
         <Fact label="Email">
           <a href={`mailto:${r.email}`}>{r.email}</a>
         </Fact>
-        <Fact label="Phone">{r.phone}</Fact>
+        <Fact label="Phone">{r.phone || '—'}</Fact>
         <Fact label="Vehicle">{r.vehicle}</Fact>
         <Fact label={r.status === 'pending' ? 'Applied' : 'Rider since'}>{dateShort(r.joinedAt)}</Fact>
       </dl>
@@ -194,7 +205,7 @@ function RiderDrawer({ r, onClose, onChange }) {
           <h3 className="drawer__section">Last 30 days</h3>
           <dl className="facts">
             <Fact label="Deliveries">{count(r.deliveries30)}</Fact>
-            <Fact label="On time">{percent(r.onTime, 0)}</Fact>
+            <Fact label="On time">{r.onTime == null ? '—' : percent(r.onTime, 0)}</Fact>
             <Fact label="Rating">{r.rating ? `★ ${r.rating.toFixed(1)}` : '—'}</Fact>
             <Fact label="Earnings incl. tips">{money(r.earnings30)}</Fact>
           </dl>

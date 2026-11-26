@@ -16,10 +16,15 @@ export default function Analytics() {
   const [range, setRange] = useState('30d');
   const [metric, setMetric] = useState('gmv');
   const [data, setData] = useState(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let stale = false;
-    adminApi.analytics(range).then((d) => !stale && setData(d));
+    setError('');
+    adminApi
+      .analytics(range)
+      .then((d) => !stale && setData(d))
+      .catch((err) => !stale && setError(err.message));
     return () => {
       stale = true;
     };
@@ -38,8 +43,9 @@ export default function Analytics() {
       <PageHead title="Analytics" subtitle={`The last ${days} days, compared with the ${days} days before.`}>
         <RangePicker value={range} onChange={setRange} ranges={RANGES} />
       </PageHead>
+      {error && <p className="notice notice--error">{error}</p>}
       {!data ? (
-        <Loading />
+        !error && <Loading />
       ) : (
         <>
           <dl className="stat-row dash-stats dash-stats--6">

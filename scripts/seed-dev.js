@@ -8,7 +8,7 @@
 //
 // Safe to run again: it resets these accounts' passwords and roles to what's listed here.
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { auth } from '../server/auth.js';
 import { db, pool, schema } from '../server/db/index.js';
 
@@ -34,6 +34,7 @@ const RESTAURANT = {
   description: 'West African home cooking: smoky jollof, suya and stews made the way Mama does.',
   colors: ['#a855f7', '#6d28d9'],
   prepMin: 20,
+  phone: '+1 555 010 0142',
   x: 800,
   y: 300,
   status: 'active',
@@ -68,7 +69,7 @@ try {
   await db
     .insert(restaurant)
     .values(RESTAURANT)
-    .onConflictDoUpdate({ target: restaurant.id, set: { status: 'active', cuisine: RESTAURANT.cuisine } });
+    .onConflictDoUpdate({ target: restaurant.id, set: { status: 'active', statusNote: '', cuisine: RESTAURANT.cuisine, phone: sql`coalesce(${restaurant.phone}, excluded.phone)` } });
   // Add any dish that isn't on the menu yet (matched by name, so edits made in the dashboard stay).
   const existing = new Set((await db.select({ name: menuItem.name }).from(menuItem).where(eq(menuItem.restaurantId, RESTAURANT.id))).map((m) => m.name));
   for (const [i, m] of MENU.entries()) {

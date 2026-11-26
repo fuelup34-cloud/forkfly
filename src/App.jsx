@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import { ADDRESSES } from '../shared/core.js';
+import { ADDRESSES, applyFees } from '../shared/core.js';
 import { useRoute } from './router.jsx';
 import { useCart } from './useCart.js';
 import { load, store } from './storage.js';
@@ -42,7 +42,12 @@ export default function App() {
     () =>
       api
         .me()
-        .then(setMe)
+        .then((data) => {
+          // Fees are set by Forkfly admins; use the live ones for every price shown.
+          if (data.config) applyFees(data.config.fees);
+          setMe(data);
+          return data;
+        })
         .catch(() => setMe((cur) => cur ?? { user: null, restaurants: [], rider: null })),
     []
   );
@@ -74,6 +79,9 @@ export default function App() {
         <AdminApp me={me} path={path} />
       </Suspense>
     );
+
+  // Sign-in gets the whole screen, without the store's navigation.
+  if (path === '/signin' || path === '/signup') return <SignIn key={path} mode={path.slice(1)} onSignedIn={refreshMe} />;
 
   // Pick the page (and the title in the sticky bar) from the address.
   let page;

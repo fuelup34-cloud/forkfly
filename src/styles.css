@@ -2317,3 +2317,155 @@ textarea {
 .account-admin-link {
   margin-left: 8px;
 }
+
+/* ---------- Account: profile and workspaces ---------- */
+.account {
+  gap: 20px;
+}
+.account-profile {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.account-profile__avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent));
+  color: #fff;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.account-profile__text {
+  min-width: 0;
+  flex: 1;
+}
+.main .account-profile h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+.account-profile__text p {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+.account-profile__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.account-profile__tags .tag {
+  font-size: 12px;
+  padding: 4px 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.account-profile__tags .tag--quiet {
+  background: var(--chip-bg);
+  color: var(--text-2);
+}
+.main .account-section-title {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  gap: 4px 14px;
+  align-items: center;
+  padding: 18px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    translate 0.15s;
+}
+.workspace:hover {
+  border-color: var(--accent-link);
+  box-shadow: 0 10px 28px -14px rgba(0, 0, 0, 0.25);
+  translate: 0 -1px;
+}
+.workspace:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+.workspace--admin {
+  background: linear-gradient(135deg, #064e3b, #047857);
+  border-color: transparent;
+  color: #ecfdf5;
+}
+.workspace__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.workspace__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.workspace--admin .workspace__text {
+  color: rgba(236, 253, 245, 0.78);
+}
+.workspace__text strong {
+  font-size: 16px;
+  color: inherit;
+}
+.workspace:not(.workspace--admin) .workspace__text strong {
+  color: var(--text);
+}
+.workspace--admin .workspace__text strong {
+  color: #fff;
+}
+.workspace__go {
+  grid-column: 2;
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-link);
+}
+.workspace--admin .workspace__go {
+  color: #6ee7b7;
+}
+.workspace__status--active {
+  color: var(--accent-link);
+}
+.workspace__status--suspended {
+  color: var(--danger);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .account-profile__tags .tag:not(.tag--quiet) {
+    background: rgba(16, 185, 129, 0.16);
+    color: #6ee7b7;
+  }
+}
+:root[data-theme='dark'] .account-profile__tags .tag:not(.tag--quiet) {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+}

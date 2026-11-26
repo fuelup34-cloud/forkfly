@@ -47,7 +47,7 @@ When signing up, people choose what they're here for:
 - **Deliver**: also creates a *pending* rider.
 
 A signed-in customer can apply later from **Account → Work with Forkfly**.
-Until the admin dashboard exists, approvals happen in the terminal:
+Admins approve applications on the admin dashboard (below). The same jobs also work from the terminal:
 
 ```bash
 npm run manage -- list                                   # restaurants, staff, riders, admins
@@ -82,6 +82,29 @@ is not in git, so back it up or move to object storage before hosting. The demo 
 covers are hotlinked from Unsplash, which is free to use under the Unsplash License. Menu items
 only show photos the restaurant uploads.
 
+## Admin dashboard
+
+Accounts with the admin role open **/admin** (sign in as `admin@example.com` locally):
+
+- **Overview**: orders, order value, Forkfly revenue (fees + commission) and delivery time for today,
+  7 or 30 days against the period before, live orders, and what needs attention: applications, and
+  restaurants losing more than 1 in 10 orders this week.
+- **Orders**: every order with search and filters. Admins can cancel any order that isn't finished;
+  the customer and kitchen see it straight away. Refunds come with card payments.
+- **Analytics**: trends, busiest hours and weekdays, top restaurants, cuisines, outcomes, new vs. returning.
+- **Restaurants**: approve or decline applications, suspend with a reason (the owner sees it on their
+  dashboard), reinstate, and set each partner's commission. New orders record the commission at the
+  rate when they were placed.
+- **Riders**: approve, decline, suspend (with a reason) and reinstate.
+- **Customers**: suspend or reinstate. A suspended account is signed out everywhere and can't sign in.
+- **Settings**: customer fees, minimum order, delivery radius, pausing all ordering, default commission,
+  rider pay, auto-approving riders, and the admin team (add someone by the email of their existing
+  account). Fees take effect for new orders at once, in checkout and on the server.
+
+Reports use `PLATFORM_TIMEZONE` (default `America/New_York`) for "today" and day boundaries.
+Not built yet: rider presence and ratings (they arrive with the rider app), email notifications
+(the preferences are saved), and refunds (they need payments).
+
 ## Database
 
 Postgres, with [Drizzle](https://orm.drizzle.team) for the schema and queries, and
@@ -93,7 +116,8 @@ Postgres, with [Drizzle](https://orm.drizzle.team) for the schema and queries, a
 | `restaurant`, `menu_item` | Restaurants (`status`, `is_own`, cover photo, time zone) and their menus |
 | `restaurant_member` | Who can manage which restaurant (owner or staff) |
 | `rider` | Riders and their approval status |
-| `order` | Orders, with snapshots of the items, prices and address at the time, and why one was declined |
+| `order` | Orders, with snapshots of the items, prices and address at the time, Forkfly's commission, and why one was declined |
+| `setting` | Platform settings edited on the admin dashboard (fees, rules, rider pay) |
 
 After changing the schema, run `npm run db:generate` to write a migration, then `npm run db:migrate`
 (`npm start` migrates automatically). `npm run db:studio` opens a browser view of the data.
@@ -117,6 +141,7 @@ which reveals the approximate area being viewed to them. Their public tiles aren
   only accepted from the app's own pages.
 - `server/orders.js` — placing orders (prices always recalculated here) and the kitchen's steps.
 - `server/dashboard.js` — the restaurant dashboard API, with owner/staff permissions.
+- `server/admin.js` — the admin dashboard API (reports, approvals, suspensions); `server/settings.js` — platform settings.
 - `server/catalog.js`, `server/uploads.js`, `server/http.js` — menus, photos, request helpers.
 - `server/auth.js` — sign-in setup, and the list of addresses allowed to use it.
 - `server/db/` — schema, migrations, seeding.
@@ -124,8 +149,11 @@ which reveals the approximate area being viewed to them. Their public tiles aren
 - `shared/core.js` — fees, map routes and the delivery timeline, used by both server and app so they agree.
 - `src/` — the React app: browse → menu → checkout → live tracking → order history.
 - `src/dashboard/` — the restaurant dashboard, loaded only by people who open it.
+- `src/admin/` — the admin dashboard; `src/ui/` — parts both dashboards share.
 
 ## Fees
+
+The defaults below. Admins can change them under **Admin → Settings**.
 
 | Fee | Amount |
 | --- | --- |

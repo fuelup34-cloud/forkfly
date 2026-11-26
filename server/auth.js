@@ -4,7 +4,9 @@
 import os from 'node:os';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { APIError } from 'better-auth/api';
 import { fromNodeHeaders } from 'better-auth/node';
+import { eq } from 'drizzle-orm';
 import { db, schema } from './db/index.js';
 
 const HTTP_PORT = Number(process.env.PORT) || 3002;
@@ -54,6 +56,18 @@ export const auth = betterAuth({
     additionalFields: {
       // input: false — nobody can make themselves an admin by sending a role when signing up.
       role: { type: 'string', defaultValue: 'customer', input: false },
+      // 'suspended' by an admin: they can't sign in, and existing sessions stop working.
+      status: { type: 'string', defaultValue: 'active', input: false },
+    },
+  },
+  databaseHooks: {
+    session: {
+      create: {
+        async before(session) {
+          const [u] = await db.select({ status: schema.user.status }).from(schema.user).where(eq(schema.user.id, session.userId));
+          if (u?.status === 'suspended') throw new APIError('FORBIDDEN', { message: 'This account is suspended. Contact Forkfly support.' });
+        },
+      },
     },
   },
   session: {
@@ -76,7 +90,9 @@ export const auth = betterAuth({
 // The signed-in user for a Node request (or WebSocket upgrade), or null.
 export async function getSession(req) {
   try {
-    return await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+    const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+    // Sessions are also deleted on suspension; this covers one cached in a cookie.
+    return session?.user?.status === 'suspended' ? null : session;
   } catch {
     return null;
   }

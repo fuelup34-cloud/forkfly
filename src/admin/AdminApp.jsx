@@ -37,8 +37,8 @@ export default function AdminApp({ me, path }) {
   const [pending, setPending] = useState({ restaurants: 0, riders: 0 });
   const refreshPending = useCallback(() => {
     adminApi
-      .overview('today')
-      .then((o) => setPending({ restaurants: o.attention.restaurants.length, riders: o.attention.riders.length }))
+      .counts()
+      .then(setPending)
       .catch(() => {});
   }, []);
   const isAdmin = me?.user?.role === 'admin';
@@ -110,9 +110,6 @@ export default function AdminApp({ me, path }) {
             </Link>
           ))}
         </nav>
-        <div className="admin-sample-note">
-          <Icon name="alert" size={14} /> Sample data — not connected to the server yet.
-        </div>
         <div className="dash-side__foot">
           <Link to="/account" className="dash-side__user">
             <Icon name="user" size={16} /> {me.user.name}

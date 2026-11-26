@@ -34,6 +34,7 @@ function Profile({ restaurant, owner, onChange }) {
     prepMin: r.prepMin,
     priceLevel: r.priceLevel,
     coverImage: r.coverImage,
+    phone: r.phone ?? '',
   });
   const [form, setForm] = useState(() => pick(restaurant));
   const [busy, setBusy] = useState(false);
@@ -97,6 +98,12 @@ function Profile({ restaurant, owner, onChange }) {
               ))}
           </select>
         </label>
+        <label className="field">
+          <span>Phone (for Forkfly, not shown to customers)</span>
+          <input type="tel" autoComplete="tel" inputMode="tel" maxLength={20} pattern="\+?[0-9 ()\-.]{7,20}" value={form.phone} onChange={set('phone')} disabled={!owner} />
+        </label>
+      </div>
+      <div className="field-row">
         <label className="field">
           <span>Price range</span>
           <select value={form.priceLevel} onChange={set('priceLevel', true)} disabled={!owner}>

@@ -18,6 +18,7 @@ export default function Overview() {
 
   useEffect(() => {
     let stale = false;
+    setError('');
     adminApi
       .overview(range)
       .then((d) => !stale && setData(d))
@@ -38,7 +39,7 @@ export default function Overview() {
       </PageHead>
       {error && <p className="notice notice--error">{error}</p>}
       {!data ? (
-        <Loading />
+        !error && <Loading />
       ) : (
         <>
           <dl className="stat-row dash-stats">

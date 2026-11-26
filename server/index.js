@@ -3,6 +3,7 @@
 //   • /api/auth/...  accounts: sign up, sign in, sign out (Better Auth)
 //   • /api/...       restaurants, menus and orders (JSON over HTTP), stored in Postgres
 //   • /api/dash/...  the restaurant dashboard (see dashboard.js)
+//   • /api/admin/... the Forkfly admin dashboard (see admin.js)
 //   • /uploads/...   restaurant photos
 //   • /ws            live updates: order tracking for customers, the order board for kitchens
 //   • serves the built site from dist/ when you run `npm start`
@@ -38,6 +39,8 @@ import {
   REJECT_REASONS,
 } from './orders.js';
 import { handleDashboard, membership } from './dashboard.js';
+import { handleAdmin } from './admin.js';
+import { loadSettings, publicConfig, settings } from './settings.js';
 import { handleUpload, serveUpload } from './uploads.js';
 import { ADDRESSES, CITY_SIZE, GRID, VEHICLES, kitchenStatus, orderSnapshot } from '../shared/core.js';
 
@@ -60,7 +63,7 @@ const { restaurant: restaurantTable, restaurantMember, rider: riderTable, order:
 
 // What the customer sees (never anyone's account id).
 function view(order) {
-  const { customerId, customerLabel, ...rest } = orderSnapshot(order);
+  const { customerId, customerLabel, commission, riderId, ...rest } = orderSnapshot(order);
   if (order.rejectReason) rest.rejectReason = REJECT_REASONS[order.rejectReason];
   if (order.gps && tls) {
     const lan = Object.values(os.networkInterfaces()).flat().find((n) => n.family === 'IPv4' && !n.internal);
@@ -78,18 +81,20 @@ async function me(user) {
     .innerJoin(restaurantTable, eq(restaurantTable.id, restaurantMember.restaurantId))
     .where(eq(restaurantMember.userId, user.id))
     .orderBy(asc(restaurantTable.name));
-  const [rider] = await db.select({ status: riderTable.status, vehicle: riderTable.vehicle }).from(riderTable).where(eq(riderTable.userId, user.id));
+  const [rider] = await db.select({ status: riderTable.status, vehicle: riderTable.vehicle, note: riderTable.statusNote }).from(riderTable).where(eq(riderTable.userId, user.id));
   return {
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
     restaurants,
     rider: rider ?? null,
+    config: publicConfig(),
   };
 }
 
 // ---------- Joining as a restaurant partner or rider ----------
 //
-// Both start as "pending" and do nothing until an admin approves them
-// (for now: `npm run manage -- approve-restaurant <id>` / `approve-rider <email>`).
+// Both start as "pending" and do nothing until an admin approves them on the admin dashboard
+// (or with `npm run manage -- approve-restaurant <id>` / `approve-rider <email>`). Riders are
+// approved straight away if an admin turned on "Approve rider applications automatically".
 
 const BRAND_COLORS = [
   ['#f97316', '#b45309'],
@@ -101,9 +106,13 @@ const BRAND_COLORS = [
   ['#14b8a6', '#0f766e'],
 ];
 
+const PHONE = /^\+?[0-9 ().-]{7,20}$/;
+
 async function applyRestaurant(user, body) {
   const name = cleanText(body?.name, { min: 2, max: 60, label: 'Restaurant name' });
   const cuisine = cleanText(body?.cuisine, { min: 2, max: 30, label: 'Cuisine' });
+  const phone = typeof body?.phone === 'string' ? body.phone.trim() : '';
+  if (!PHONE.test(phone)) throw new HttpError(400, 'Enter a phone number we can reach the restaurant on.');
   const owned = await db
     .select({ id: restaurantMember.restaurantId })
     .from(restaurantMember)
@@ -123,7 +132,9 @@ async function applyRestaurant(user, body) {
       colors: BRAND_COLORS[Math.floor(Math.random() * BRAND_COLORS.length)],
       x: cell(),
       y: cell(),
+      phone,
       status: 'pending',
+      commission: settings().commission,
     });
     await tx.insert(restaurantMember).values({ restaurantId: id, userId: user.id, role: 'owner' });
     return { id, name, status: 'pending' };
@@ -134,11 +145,12 @@ async function applyRider(user, body) {
   const vehicle = VEHICLES.includes(body?.vehicle) ? body.vehicle : null;
   if (!vehicle) throw new HttpError(400, 'Pick how you’ll deliver.');
   const phone = typeof body?.phone === 'string' ? body.phone.trim() : '';
-  if (!/^\+?[0-9 ().-]{7,20}$/.test(phone)) throw new HttpError(400, 'Enter a phone number we can reach you on.');
+  if (!PHONE.test(phone)) throw new HttpError(400, 'Enter a phone number we can reach you on.');
   const [existing] = await db.select().from(riderTable).where(eq(riderTable.userId, user.id));
   if (existing) throw new HttpError(409, 'You’ve already applied to ride.');
-  await db.insert(riderTable).values({ userId: user.id, vehicle, phone, status: 'pending' });
-  return { status: 'pending', vehicle };
+  const status = settings().autoApproveRiders ? 'approved' : 'pending';
+  await db.insert(riderTable).values({ userId: user.id, vehicle, phone, status });
+  return { status, vehicle };
 }
 
 // ---------- Real GPS couriers ----------
@@ -211,7 +223,7 @@ async function handleApi(req, res, url) {
 
   if (req.method === 'GET' && parts[0] === 'me' && parts.length === 1) {
     const session = await getSession(req);
-    return json(res, 200, session ? await me(session.user) : { user: null, restaurants: [], rider: null });
+    return json(res, 200, session ? await me(session.user) : { user: null, restaurants: [], rider: null, config: publicConfig() });
   }
 
   if (req.method === 'POST' && parts[0] === 'apply' && parts.length === 2) {
@@ -223,6 +235,8 @@ async function handleApi(req, res, url) {
   if (req.method === 'POST' && parts[0] === 'uploads' && parts.length === 1) return handleUpload(req, res, await requireUser(req));
 
   if (parts[0] === 'dash' && parts[1]) return handleDashboard(req, res, await requireUser(req), parts.slice(1));
+
+  if (parts[0] === 'admin' && parts[1]) return handleAdmin(req, res, await requireUser(req), parts.slice(1), url);
 
   if (parts[0] === 'courier' && parts[1]) return handleCourier(req, res, parts[1], parts[2]);
 
@@ -436,6 +450,7 @@ setInterval(() => {
   for (const id of restaurants) pushBoard(id);
 }, TICK_MS);
 
+await loadSettings();
 await loadWaiting().catch((err) => console.error('Could not load waiting orders:', err.message));
 setInterval(() => declineUnanswered(), 15_000);
 

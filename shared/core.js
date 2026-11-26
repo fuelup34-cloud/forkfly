@@ -32,6 +32,13 @@ export const FEES = {
   smallOrderUnder: 1000, // orders under $10…
   smallOrderFee: 100, // …pay $1.00 extra
 };
+export const DEFAULT_FEES = Object.freeze({ ...FEES });
+
+// Admins can change fees (admin → Settings). The server loads them at start and the app gets
+// them with /api/me, so both sides price orders the same way. Only known keys are taken.
+export function applyFees(next) {
+  for (const key of Object.keys(DEFAULT_FEES)) if (Number.isFinite(next?.[key])) FEES[key] = next[key];
+}
 
 // How a rider can deliver.
 export const VEHICLES = ['Bicycle', 'E-bike', 'Scooter', 'Motorbike', 'Car'];

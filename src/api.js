@@ -3,7 +3,7 @@ import { createAuthClient } from 'better-auth/client';
 // Sign-up, sign-in and sign-out. The session is a cookie, so every request below carries it.
 export const authClient = createAuthClient({ baseURL: location.origin, basePath: '/api/auth' });
 
-async function request(path, { method = 'GET', body } = {}) {
+export async function request(path, { method = 'GET', body } = {}) {
   const res = await fetch(`/api${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
@@ -59,6 +59,16 @@ export const dash = {
 // Restaurant lists are cached for quick back/forward; a dashboard change should show right away.
 export function forgetRestaurantCache() {
   cache.clear();
+}
+
+// Where someone's work lives: admins → the admin dashboard, restaurant teams → their dashboard.
+// null for customers and riders, who stay on the storefront.
+export function homeFor(me) {
+  if (me?.user?.role === 'admin') return '/admin';
+  const restaurants = me?.restaurants ?? [];
+  if (restaurants.length === 1) return `/dashboard/${restaurants[0].id}`;
+  if (restaurants.length > 1) return '/dashboard';
+  return null;
 }
 
 // Where to send someone after they sign in. Only paths on this site, never another website.

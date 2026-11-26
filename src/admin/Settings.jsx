@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useConfirm } from '../components/ConfirmDialog.jsx';
 import { adminApi } from './adminApi.js';
 import { PageHead } from './AdminApp.jsx';
 import { Avatar, Loading, SaveBar, money, percent } from '../ui/kit.jsx';
@@ -8,23 +9,30 @@ export default function Settings({ me }) {
   const [form, setForm] = useState(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    adminApi.settings().then((s) => {
-      setSaved(s);
-      setForm(s);
-    });
+    adminApi
+      .settings()
+      .then((s) => {
+        setSaved(s);
+        setForm(s);
+      })
+      .catch((err) => setError(err.message));
   }, []);
 
   if (!form)
     return (
       <>
         <PageHead title="Settings" />
-        <Loading />
+        {error ? <p className="notice notice--error">{error}</p> : <Loading />}
       </>
     );
 
-  const dirty = JSON.stringify(form) !== JSON.stringify(saved);
+  // The admin team saves on its own (see Admins), so it never makes the form "unsaved".
+  const { admins: _a, ...formFields } = form;
+  const { admins: _b, ...savedFields } = saved;
+  const dirty = JSON.stringify(formFields) !== JSON.stringify(savedFields);
   const set = (path, value) =>
     setForm((f) => {
       const next = structuredClone(f);
@@ -36,12 +44,23 @@ export default function Settings({ me }) {
   async function save(e) {
     e.preventDefault();
     setBusy(true);
-    const s = await adminApi.saveSettings(form);
-    setSaved(s);
-    setForm(s);
-    setBusy(false);
-    setNote('Settings saved.');
+    setError('');
+    setNote('');
+    try {
+      const s = await adminApi.saveSettings(form);
+      setSaved(s);
+      setForm(s);
+      setNote('Settings saved. New orders use them straight away.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
   }
+  const setAdmins = (admins) => {
+    setForm((f) => ({ ...f, admins }));
+    setSaved((s) => ({ ...s, admins }));
+  };
 
   return (
     <form className="settings dash-settings" onSubmit={save}>
@@ -117,6 +136,7 @@ export default function Settings({ me }) {
 
       <section className="dash-card">
         <h2 className="dash-card__title">Email me when</h2>
+        <p className="muted small">Saved now; emails start once an email service is connected.</p>
         <fieldset className="checks checks--column" aria-label="Email notifications">
           {[
             ['newRestaurant', 'A restaurant applies'],
@@ -139,8 +159,13 @@ export default function Settings({ me }) {
         </div>
       </section>
 
-      <Admins admins={form.admins} me={me} onChange={(admins) => set('admins', admins)} />
+      <Admins admins={form.admins} me={me} onChange={setAdmins} />
 
+      {error && (
+        <p className="notice notice--error" role="alert">
+          {error}
+        </p>
+      )}
       <SaveBar dirty={dirty} busy={busy} note={note} onDiscard={() => setForm(saved)} />
     </form>
   );
@@ -201,22 +226,42 @@ function FeeExample({ fees }) {
 
 function Admins({ admins, me, onChange }) {
   const [email, setEmail] = useState('');
-  function add(e) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [dialog, ask] = useConfirm();
+
+  async function run(fn) {
+    setBusy(true);
+    setError('');
+    try {
+      onChange(await fn());
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function add(e) {
     e.preventDefault();
     const clean = email.trim().toLowerCase();
-    if (!clean || admins.some((a) => a.email === clean)) return;
-    onChange([...admins, { name: clean.split('@')[0], email: clean, role: 'Invited' }]);
-    setEmail('');
+    if (!clean) return;
+    if (await run(() => adminApi.addAdmin(clean))) setEmail('');
+  }
+  async function remove(a) {
+    if (!(await ask({ title: `Remove ${a.name} as an admin?`, body: 'They keep their account but lose the admin dashboard, and are signed out.', confirm: 'Remove', danger: true }))) return;
+    run(() => adminApi.removeAdmin(a.id));
   }
   return (
     <section className="dash-card">
       <h2 className="dash-card__title">Admin team</h2>
-      <p className="muted small">Admins can see every order and approve, suspend or change any restaurant, rider or customer.</p>
+      <p className="muted small">Admins can see every order and approve, suspend or change any restaurant, rider or customer. Changes here save straight away.</p>
       <ul className="team">
         {admins.map((a) => {
-          const isMe = a.email === me.user.email;
+          const isMe = a.id === me.user.id;
           return (
-            <li key={a.email}>
+            <li key={a.id}>
               <Avatar name={a.name} />
               <span className="team__text">
                 <strong>
@@ -226,8 +271,8 @@ function Admins({ admins, me, onChange }) {
                   {a.email} · {a.role}
                 </span>
               </span>
-              {!isMe && a.role !== 'Owner' && (
-                <button type="button" className="text-btn small text-btn--danger" onClick={() => onChange(admins.filter((x) => x.email !== a.email))}>
+              {!isMe && (
+                <button type="button" className="text-btn small text-btn--danger" disabled={busy} onClick={() => remove(a)}>
                   Remove
                 </button>
               )}
@@ -237,13 +282,15 @@ function Admins({ admins, me, onChange }) {
       </ul>
       <div className="team__add team__add--2">
         <label className="field">
-          <span>Invite an admin</span>
+          <span>Add an admin (they need a Forkfly account)</span>
           <input type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add(e)} />
         </label>
-        <button type="button" className="btn btn--outline" onClick={add}>
-          Invite
+        <button type="button" className="btn btn--outline" disabled={busy || !email.trim()} onClick={add}>
+          Add
         </button>
       </div>
+      {error && <p className="notice notice--error">{error}</p>}
+      {dialog}
     </section>
   );
 }

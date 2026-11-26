@@ -18,9 +18,13 @@ export default function Customers() {
   const [sort, setSort] = useState('spent');
   const [limit, setLimit] = useState(50);
   const [dialog, ask] = useConfirm();
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    adminApi.customers().then(setList);
+    adminApi
+      .customers()
+      .then(setList)
+      .catch((err) => setError(err.message));
   }, []);
 
   async function toggle(c) {
@@ -30,7 +34,14 @@ export default function Customers() {
         ? { title: `Suspend ${c.name}?`, body: 'They won’t be able to sign in or place orders until you reinstate them.', confirm: 'Suspend', danger: true }
         : { title: `Reinstate ${c.name}?`, body: 'They’ll be able to sign in and order again.', confirm: 'Reinstate' }
     );
-    if (ok) setList(await adminApi.setCustomerStatus(c.id, suspend ? 'suspended' : 'active'));
+    if (!ok) return;
+    try {
+      const updated = await adminApi.setCustomerStatus(c.id, suspend ? 'suspended' : 'active');
+      setList((all) => all.map((x) => (x.id === updated.id ? updated : x)));
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   const needle = q.trim().toLowerCase();
@@ -69,11 +80,12 @@ export default function Customers() {
         </select>
         <SearchBox value={q} onChange={setQ} placeholder="Name or email" />
       </div>
+      {error && <p className="notice notice--error">{error}</p>}
       <section className="dash-card">
         {!list ? (
-          <Loading />
+          !error && <Loading />
         ) : !shown.length ? (
-          <Empty icon="users" title="No customers match" />
+          <Empty icon="users" title={list.length ? 'No customers match' : 'No customers yet'} />
         ) : (
           <div className="table-wrap">
             <table className="table">

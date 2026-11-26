@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from '../router.jsx';
+import { useConfirm } from '../components/ConfirmDialog.jsx';
 import { adminApi } from './adminApi.js';
 import { PageHead } from './AdminApp.jsx';
 import { Drawer, Empty, Fact, Loading, SearchBox, StatusPill, Tabs, ago, count, dateShort, money, timeShort } from '../ui/kit.jsx';
@@ -16,16 +17,25 @@ export default function Orders() {
   const [status, setStatus] = useState('all');
   const [q, setQ] = useState('');
   const [data, setData] = useState(null);
+  const [error, setError] = useState('');
   const [open, setOpen] = useState(null);
+  const [version, setVersion] = useState(0); // bumped to reload after a change
 
   useEffect(() => {
     let stale = false;
-    const t = setTimeout(() => adminApi.orders({ status, q }).then((d) => !stale && setData(d)), q ? 200 : 0);
+    const t = setTimeout(
+      () =>
+        adminApi
+          .orders({ status, q })
+          .then((d) => !stale && (setData(d), setError('')))
+          .catch((err) => !stale && setError(err.message)),
+      q ? 200 : 0
+    );
     return () => {
       stale = true;
       clearTimeout(t);
     };
-  }, [status, q]);
+  }, [status, q, version]);
 
   return (
     <>
@@ -34,9 +44,10 @@ export default function Orders() {
         <Tabs value={status} onChange={setStatus} tabs={FILTERS} />
         <SearchBox value={q} onChange={setQ} placeholder="Order #, restaurant, customer" />
       </div>
+      {error && <p className="notice notice--error">{error}</p>}
       <section className="dash-card">
         {!data ? (
-          <Loading />
+          !error && <Loading />
         ) : !data.orders.length ? (
           <Empty title="No orders match">Try another filter or search.</Empty>
         ) : (
@@ -89,14 +100,46 @@ export default function Orders() {
           </>
         )}
       </section>
-      {open && <OrderDrawer order={open} onClose={() => setOpen(null)} />}
+      {open && (
+        <OrderDrawer
+          order={open}
+          onClose={() => setOpen(null)}
+          onChange={(updated) => {
+            setOpen(updated);
+            setVersion((v) => v + 1);
+          }}
+        />
+      )}
     </>
   );
 }
 
-function OrderDrawer({ order: o, onClose }) {
-  const [done, setDone] = useState('');
+function OrderDrawer({ order: o, onClose, onChange }) {
+  const [dialog, ask] = useConfirm();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const finished = ['delivered', 'cancelled', 'rejected'].includes(o.status);
+
+  async function cancel() {
+    const ok = await ask({
+      title: `Cancel order #${o.id}?`,
+      body: `The customer and ${o.restaurant.name} will see it as cancelled straight away. This can’t be undone.`,
+      confirm: 'Cancel order',
+      cancel: 'Keep order',
+      danger: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    setError('');
+    try {
+      onChange(await adminApi.cancelOrder(o.id));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <Drawer
       title={`Order #${o.id}`}
@@ -104,19 +147,20 @@ function OrderDrawer({ order: o, onClose }) {
       footer={
         <>
           {!finished && (
-            <button type="button" className="btn btn--outline btn--danger-outline" onClick={() => setDone('Cancel requested — this will work once the server side is built.')}>
-              Cancel order
+            <button type="button" className="btn btn--outline btn--danger-outline" disabled={busy} onClick={cancel}>
+              {busy ? 'Cancelling…' : 'Cancel order'}
             </button>
           )}
           {o.status === 'delivered' && (
-            <button type="button" className="btn btn--outline" onClick={() => setDone('Refund requested — this will work once the server side is built.')}>
+            <button type="button" className="btn btn--outline" disabled title="Refunds arrive with card payments. Checkout doesn’t take payment yet.">
               Issue refund
             </button>
           )}
         </>
       }
     >
-      {done && <p className="notice notice--info">{done}</p>}
+      {error && <p className="notice notice--error">{error}</p>}
+      {dialog}
       <div className="drawer__status">
         <StatusPill status={o.status} />
         <span className="muted small">Placed {ago(o.placedAt)}</span>

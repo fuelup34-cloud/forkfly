@@ -11,8 +11,11 @@ import { COURIERS } from './restaurants.js';
 import { db, schema } from './db/index.js';
 import { HttpError, intIn } from './http.js';
 import { loadRestaurant } from './catalog.js';
+import { settings } from './settings.js';
 import {
   ADDRESSES,
+  KM_PER_MILE,
+  formatMoney,
   CITY_SIZE,
   COURIER_SPEED,
   GRID,
@@ -58,6 +61,8 @@ function fromRow(row) {
     cancelledAt: row.cancelledAt ? row.cancelledAt.getTime() : null,
     rejectedAt: row.rejectedAt ? row.rejectedAt.getTime() : null,
     rejectReason: row.rejectReason ?? null,
+    riderId: row.riderId ?? null,
+    commission: row.commission ?? 0, // Forkfly's cut; never sent to customers
     gps: row.gps ?? undefined,
   };
 }
@@ -115,6 +120,8 @@ export function shortName(name) {
 }
 
 export async function createOrder(customer, body) {
+  const rules = settings();
+  if (!rules.orderingOpen) throw new HttpError(503, 'Forkfly is paused right now. Please try again a little later.');
   const restaurant = await loadRestaurant(typeof body?.restaurantId === 'string' ? body.restaurantId : '');
   if (!restaurant || !restaurant.open) throw new HttpError(400, 'That restaurant isn’t taking orders right now.');
   const address = addressById.get(body?.addressId);
@@ -135,7 +142,9 @@ export async function createOrder(customer, body) {
   const tip = Number(body.tip);
   const safeTip = Number.isInteger(tip) && tip >= 0 && tip <= 5000 ? tip : 0;
   const subtotal = items.reduce((n, i) => n + i.price * i.qty, 0);
+  if (subtotal < rules.minOrder) throw new HttpError(400, `The minimum order is ${formatMoney(rules.minOrder)} before fees.`);
   const km = distanceKm(restaurant, address);
+  if (km / KM_PER_MILE > rules.maxRadiusMiles) throw new HttpError(400, `${restaurant.name} is too far away to deliver to that address.`);
   const pricing = priceBreakdown({ subtotal, km, tip: safeTip });
 
   // Restaurants with their own staff run their kitchen from the dashboard. The demo ones run themselves.
@@ -185,12 +194,15 @@ export async function createOrder(customer, body) {
     cancelledAt: null,
     rejectedAt: null,
     rejectReason: null,
+    riderId: null,
+    commission: Math.round(subtotal * restaurant.commission),
   };
   await db.insert(orderTable).values({
     id: order.id,
     customerId: customer.id,
     restaurantId: restaurant.id,
     total: pricing.total,
+    commission: order.commission,
     placedAt: new Date(placedAt),
     restaurantSnapshot: order.restaurant,
     address: order.address,
@@ -293,6 +305,15 @@ export async function addPrepTime(order, body) {
 }
 
 export { PREP_CHOICES };
+
+// An admin stops an order at any point before it's delivered (the customer can only cancel early).
+export async function adminCancel(order) {
+  const snap = orderSnapshot(order);
+  if (!snap.active || order.rejectedAt) throw new HttpError(409, 'This order has already finished.');
+  order.cancelledAt = Date.now();
+  if (order.gps) order.gps.trail = [];
+  await persist(order, ['cancelledAt', 'gps']);
+}
 
 // ---------- What the kitchen sees ----------
 

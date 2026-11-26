@@ -17,14 +17,24 @@ export default function Restaurants({ onChange }) {
   const [q, setQ] = useState('');
   const [dialog, ask] = useConfirm();
 
-  const load = () => adminApi.restaurants().then(setList);
+  const [error, setError] = useState('');
+  const load = () =>
+    adminApi
+      .restaurants()
+      .then(setList)
+      .catch((err) => setError(err.message));
   useEffect(() => {
     load();
   }, []);
 
   async function approve(r) {
     if (!(await ask({ title: `Approve ${r.name}?`, body: 'They’ll go live on Forkfly and start receiving orders.', confirm: 'Approve' }))) return;
-    await adminApi.setRestaurantStatus(r.id, 'active');
+    try {
+      await adminApi.setRestaurantStatus(r.id, 'active');
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    }
     await load();
     onChange?.();
   }
@@ -40,9 +50,10 @@ export default function Restaurants({ onChange }) {
         <Tabs value={status} onChange={setStatus} tabs={tabs} />
         <SearchBox value={q} onChange={setQ} placeholder="Name, cuisine or owner" />
       </div>
+      {error && <p className="notice notice--error">{error}</p>}
       <section className="dash-card">
         {!list ? (
-          <Loading />
+          !error && <Loading />
         ) : !shown.length ? (
           <Empty icon="store" title={status === 'pending' ? 'No applications waiting' : 'No restaurants match'} />
         ) : (
@@ -119,6 +130,7 @@ export function RestaurantDetail({ id, onChange }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState(null); // { title, confirm, status }
+  const [actionError, setActionError] = useState('');
   const [dialog, ask] = useConfirm();
 
   useEffect(() => {
@@ -130,9 +142,12 @@ export function RestaurantDetail({ id, onChange }) {
 
   async function setStatus(status, note = '') {
     setBusy(true);
+    setActionError('');
     try {
       setR(await adminApi.setRestaurantStatus(id, status, note));
       onChange?.();
+    } catch (err) {
+      setActionError(err.message);
     } finally {
       setBusy(false);
     }
@@ -202,6 +217,7 @@ export function RestaurantDetail({ id, onChange }) {
         </div>
       </header>
 
+      {actionError && <p className="notice notice--error">{actionError}</p>}
       {r.status === 'pending' && (
         <p className="notice notice--info">
           <strong>New application, {ago(r.joinedAt)}.</strong> Check the details below, then approve to put {r.name} live.
@@ -245,7 +261,7 @@ export function RestaurantDetail({ id, onChange }) {
             <ul className="checklist">
               <li className="is-done">Owner account created</li>
               <li className={r.menuItems >= 5 ? 'is-done' : ''}>Menu has at least 5 items ({r.menuItems} so far)</li>
-              <li>Cover photo uploaded</li>
+              <li className={r.coverImage ? 'is-done' : ''}>Cover photo uploaded</li>
               <li>Food-safety certificate checked</li>
             </ul>
           </section>
@@ -277,20 +293,24 @@ export function RestaurantDetail({ id, onChange }) {
 function Details({ r, onSave }) {
   const [commission, setCommission] = useState(r.commission);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
   useEffect(() => setCommission(r.commission), [r.commission]);
   async function save() {
-    onSave(await adminApi.setCommission(r.id, commission));
-    setSaved(true);
+    setError('');
+    try {
+      onSave(await adminApi.setCommission(r.id, commission));
+      setSaved(true);
+    } catch (err) {
+      setError(err.message);
+    }
   }
   return (
     <section className="dash-card">
       <h2 className="dash-card__title">Details</h2>
       <dl className="facts facts--1">
         <Fact label="Owner">{r.owner.name}</Fact>
-        <Fact label="Email">
-          <a href={`mailto:${r.owner.email}`}>{r.owner.email}</a>
-        </Fact>
-        <Fact label="Phone">{r.phone}</Fact>
+        <Fact label="Email">{r.owner.email ? <a href={`mailto:${r.owner.email}`}>{r.owner.email}</a> : '—'}</Fact>
+        <Fact label="Phone">{r.phone || '—'}</Fact>
         <Fact label="Joined">{dateShort(r.joinedAt)}</Fact>
         <Fact label="Menu items">{r.menuItems}</Fact>
         <Fact label="Usual prep time">{r.prepMin} min</Fact>
@@ -306,7 +326,7 @@ function Details({ r, onSave }) {
             }}
             disabled={r.isOwn}
           >
-            {[0, 0.1, 0.12, 0.15, 0.18, 0.2, 0.25].map((c) => (
+            {[...new Set([0, 0.1, 0.12, 0.15, 0.18, 0.2, 0.25, r.commission])].sort((a, b) => a - b).map((c) => (
               <option key={c} value={c}>
                 {percent(c, 0)}
               </option>
@@ -318,7 +338,8 @@ function Details({ r, onSave }) {
         </button>
       </div>
       {r.isOwn && <p className="muted small">Forkfly’s own kitchens don’t pay commission.</p>}
-      {saved && <p className="saved-note">Saved</p>}
+      {saved && <p className="saved-note">Saved. Applies to new orders.</p>}
+      {error && <p className="notice notice--error">{error}</p>}
     </section>
   );
 }

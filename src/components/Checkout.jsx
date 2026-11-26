@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ADDRESSES, TIP_OPTIONS, distanceKm, formatMoney, priceBreakdown } from '../../shared/core.js';
+import { ADDRESSES, KM_PER_MILE, TIP_OPTIONS, distanceKm, formatMoney, priceBreakdown } from '../../shared/core.js';
 import { api, signInLink } from '../api.js';
 import Icon from './Icon.jsx';
 import Monogram from './Monogram.jsx';
@@ -36,6 +36,17 @@ export default function Checkout({ cart, addressId, setAddressId, me }) {
   const address = ADDRESSES.find((a) => a.id === addressId);
   const km = restaurant ? distanceKm(restaurant, address) : null;
   const pricing = priceBreakdown({ subtotal: cart.subtotal, km: km ?? 0, tip });
+  // Rules set by Forkfly admins. The server checks them too.
+  const config = me?.config;
+  const blocked = !config
+    ? ''
+    : !config.orderingOpen
+      ? 'Forkfly is paused right now. Please try again a little later.'
+      : cart.subtotal < config.minOrder
+        ? `The minimum order is ${formatMoney(config.minOrder)} before fees. Add ${formatMoney(config.minOrder - cart.subtotal)} more.`
+        : km != null && km / KM_PER_MILE > config.maxRadiusMiles
+          ? `${restaurant.name} is too far away to deliver to this address.`
+          : '';
 
   async function placeOrder() {
     setBusy(true);
@@ -119,6 +130,11 @@ export default function Checkout({ cart, addressId, setAddressId, me }) {
         <aside className="panel checkout__summary">
           <h2>Summary</h2>
           <FeeLines pricing={pricing} km={km} />
+          {blocked && (
+            <p className="notice notice--warn" role="status">
+              {blocked}
+            </p>
+          )}
           {error && (
             <p className="notice notice--error" role="alert">
               {error}
@@ -129,7 +145,7 @@ export default function Checkout({ cart, addressId, setAddressId, me }) {
               Sign in to place your order
             </Link>
           ) : (
-            <button type="button" className="btn btn--block btn--big" onClick={placeOrder} disabled={busy || !restaurant || !me}>
+            <button type="button" className="btn btn--block btn--big" onClick={placeOrder} disabled={busy || !restaurant || !me || !!blocked}>
               {busy ? 'Placing order…' : `Place order · ${formatMoney(pricing.total)}`}
             </button>
           )}

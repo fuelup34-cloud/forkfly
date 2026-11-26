@@ -26,10 +26,12 @@ export const user = pgTable(
     // 'customer' or 'admin'. Restaurant staff and riders are customers too; what else they
     // can do comes from restaurant_member and rider, so one person can be both.
     role: text().notNull().default('customer'),
+    // active, or suspended by an admin (can't sign in or order).
+    status: text().notNull().default('active'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [check('user_role_check', sql`${t.role} in ('customer', 'admin')`)]
+  (t) => [check('user_role_check', sql`${t.role} in ('customer', 'admin')`), check('user_status_check', sql`${t.status} in ('active', 'suspended')`)]
 );
 
 export const session = pgTable(
@@ -108,10 +110,15 @@ export const restaurant = pgTable(
     isOwn: boolean().notNull().default(false),
     // pending: applied, not approved yet · active: taking orders · paused: closed for now · suspended: by us
     status: text().notNull().default('pending'),
+    // Why an admin suspended or declined it. The owner sees this on their dashboard.
+    statusNote: text().notNull().default(''),
+    // Share of food sales Forkfly keeps (0.15 = 15%). Set from the default when approved.
+    commission: real().notNull().default(0.15),
+    phone: text(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [check('restaurant_status_check', sql`${t.status} in ('pending', 'active', 'paused', 'suspended')`)]
+  (t) => [check('restaurant_commission_check', sql`${t.commission} >= 0 and ${t.commission} <= 0.5`), check('restaurant_status_check', sql`${t.status} in ('pending', 'active', 'paused', 'suspended')`)]
 );
 
 export const menuItem = pgTable(
@@ -170,6 +177,7 @@ export const rider = pgTable(
     status: text().notNull().default('pending'),
     vehicle: text().notNull().default('Bicycle'),
     phone: text(),
+    statusNote: text().notNull().default(''), // why an admin suspended or declined them
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -189,6 +197,9 @@ export const order = pgTable(
       .references(() => restaurant.id),
     riderId: text().references(() => rider.userId, { onDelete: 'set null' }), // set once real dispatch exists
     total: integer().notNull(), // cents, copied from pricing for quick reporting
+    // Forkfly's commission on the food, in cents, at the rate when the order was placed.
+    // Kept off `pricing` because customers see that.
+    commission: integer().notNull().default(0),
     placedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     cancelledAt: timestamp({ withTimezone: true }),
     rejectedAt: timestamp({ withTimezone: true }), // the restaurant couldn't take it
@@ -215,3 +226,13 @@ export const order = pgTable(
     index('order_rider_idx').on(t.riderId),
   ]
 );
+
+// ---------- Platform settings ----------
+
+// One row per group of settings (for now just 'platform'). Edited on the admin Settings page.
+export const setting = pgTable('setting', {
+  key: text().primaryKey(),
+  value: jsonb().$type().notNull(),
+  updatedBy: text().references(() => user.id, { onDelete: 'set null' }),
+  updatedAt: updatedAt(),
+});

@@ -42,6 +42,10 @@ export function JoinFields({ type, values, onChange }) {
           <span>Cuisine</span>
           <input required minLength={2} maxLength={30} placeholder="e.g. Thai, Burgers, Bakery" value={values.cuisine} onChange={set('cuisine')} />
         </label>
+        <label className="field">
+          <span>Restaurant phone</span>
+          <input required type="tel" autoComplete="tel" inputMode="tel" maxLength={20} pattern="\+?[0-9 ()\-]{7,20}" value={values.phone} onChange={set('phone')} />
+        </label>
       </>
     );
   if (type === 'rider')
@@ -65,7 +69,7 @@ export function JoinFields({ type, values, onChange }) {
 }
 
 export function submitApplication(api, type, values) {
-  if (type === 'restaurant') return api.applyRestaurant({ name: values.restaurantName.trim(), cuisine: values.cuisine.trim() });
+  if (type === 'restaurant') return api.applyRestaurant({ name: values.restaurantName.trim(), cuisine: values.cuisine.trim(), phone: values.phone.trim() });
   if (type === 'rider') return api.applyRider({ vehicle: values.vehicle, phone: values.phone.trim() });
   return Promise.resolve();
 }

@@ -43,6 +43,8 @@ function profile(r, role) {
     prepMin: r.prepMin,
     priceLevel: r.priceLevel,
     status: r.status,
+    statusNote: r.statusNote,
+    phone: r.phone ?? '',
     isOwn: r.isOwn,
     timezone: r.timezone,
     role,
@@ -132,6 +134,11 @@ export async function handleDashboard(req, res, user, parts) {
       if (has('prepMin')) set.prepMin = intIn(body.prepMin, { min: 5, max: 90, label: 'Usual prep time' });
       if (has('priceLevel')) set.priceLevel = intIn(body.priceLevel, { min: 1, max: 4, label: 'Price level' });
       if (has('coverImage')) set.coverImage = optionalImage(body.coverImage);
+      if (has('phone')) {
+        const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+        if (!/^\+?[0-9 ().-]{7,20}$/.test(phone)) throw new HttpError(400, 'Enter a phone number Forkfly can reach you on.');
+        set.phone = phone;
+      }
       if (!Object.keys(set).length) return json(res, 200, profile(r, role));
       const [updated] = await db.update(restaurantTable).set(set).where(eq(restaurantTable.id, r.id)).returning();
       return json(res, 200, profile(updated, role));
